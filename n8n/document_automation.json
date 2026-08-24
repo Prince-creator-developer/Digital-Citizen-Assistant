@@ -1,0 +1,54 @@
+{
+  "name": "Digital Citizen Document Verification Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "document-verify",
+        "options": {}
+      },
+      "name": "n8n Webhook Listener",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "verification_status", "value": "Aadhaar & Ration Card Verified" },
+            { "name": "dbt_eligibility", "value": "Direct Benefit Transfer Approved" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "OCR Document Extraction",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://localhost:8000/api/v1/application/status-update",
+        "options": {}
+      },
+      "name": "Database Status Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "n8n Webhook Listener": {
+      "main": [
+        [ { "node": "OCR Document Extraction", "type": "main", "index": 0 } ]
+      ]
+    },
+    "OCR Document Extraction": {
+      "main": [
+        [ { "node": "Database Status Callback", "type": "main", "index": 0 } ]
+      ]
+    }
+  }
+}

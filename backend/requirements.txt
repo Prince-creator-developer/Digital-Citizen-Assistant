@@ -1,0 +1,12 @@
+fastapi==0.110.0
+uvicorn==0.28.0
+sqlalchemy==2.0.28
+psycopg2-binary==2.9.9
+pydantic==2.6.4
+python-dotenv==1.0.1
+python-multipart==0.0.9
+requests==2.31.0
+groq==0.4.2
+google-genai==0.1.1
+google-generativeai==0.4.1
+numpy==1.26.4
