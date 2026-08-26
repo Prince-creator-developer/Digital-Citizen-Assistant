@@ -21,34 +21,60 @@ export const apiService = {
     return response.data;
   },
 
-  // Aadhaar OTP e-KYC Endpoints
-  generateAadhaarOTP: async (aadhaarNumber, citizenName = 'Citizen Applicant') => {
-    const response = await apiClient.post('/application/aadhaar/generate-otp', {
-      aadhaar_number: aadhaarNumber,
-      citizen_name: citizenName
+  // Schemes listing
+  getSchemes: async (category = null) => {
+    const params = category && category !== 'ALL' ? { category } : {};
+    const response = await apiClient.get('/schemes/', { params });
+    return response.data;
+  },
+
+  // Document OCR Upload
+  uploadDocumentOCR: async (formData, token = null) => {
+    const headers = { 'Content-Type': 'multipart/form-data' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await axios.post(`${API_BASE_URL}/application/upload-document`, formData, { headers });
+    return response.data;
+  },
+
+  // Citizen Document Vault
+  getUserDocuments: async (token) => {
+    const response = await apiClient.get('/auth/documents', {
+      headers: { Authorization: `Bearer ${token}` }
     });
     return response.data;
   },
 
-  verifyAadhaarOTP: async (refId, otp, aadhaarNumber, citizenName = 'Citizen Applicant') => {
+  deleteUserDocument: async (docId, token) => {
+    const response = await apiClient.delete(`/auth/documents/${docId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  },
+
+  // Aadhaar OTP e-KYC Endpoints
+  generateAadhaarOTP: async (aadhaarNumber, citizenName = 'Citizen Applicant', mobileNumber = '') => {
+    const response = await apiClient.post('/application/aadhaar/generate-otp', {
+      aadhaar_number: aadhaarNumber,
+      citizen_name: citizenName,
+      mobile_number: mobileNumber
+    });
+    return response.data;
+  },
+
+  verifyAadhaarOTP: async (refId, otp, aadhaarNumber, citizenName = 'Citizen Applicant', mobileNumber = '') => {
     const response = await apiClient.post('/application/aadhaar/verify-otp', {
       ref_id: refId,
       otp,
       aadhaar_number: aadhaarNumber,
-      citizen_name: citizenName
+      citizen_name: citizenName,
+      mobile_number: mobileNumber
     });
     return response.data;
   },
 
-  // Document Upload
-  uploadDocument: async (formData) => {
-    const response = await axios.post(`${API_BASE_URL}/application/apply`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
-  },
-
-  // Voice endpoints
+  // Voice STT
   sendAudioSTT: async (audioBlob, languageCode = 'hi-IN') => {
     const formData = new FormData();
     formData.append('file', audioBlob, 'voice_query.wav');
@@ -57,52 +83,6 @@ export const apiService = {
     const response = await axios.post(`${API_BASE_URL}/voice/stt`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    return response.data;
-  },
-
-  getTTS: async (text, languageCode = 'hi-IN') => {
-    const response = await apiClient.post('/voice/tts', { text, language_code: languageCode });
-    return response.data;
-  },
-
-  // Scheme endpoints
-  getSchemes: async (category = 'ALL') => {
-    const response = await apiClient.get(`/schemes/?category=${category}`);
-    return response.data;
-  },
-
-  searchSchemes: async (query, category = 'ALL', citizenProfile = null) => {
-    const response = await apiClient.post('/schemes/search', {
-      query,
-      category,
-      citizen_profile: citizenProfile,
-    });
-    return response.data;
-  },
-
-  getRecommendations: async (citizenId = 1) => {
-    const response = await apiClient.get(`/schemes/recommendations/${citizenId}`);
-    return response.data;
-  },
-
-  // Eligibility
-  checkEligibility: async (payload) => {
-    const response = await apiClient.post('/eligibility/check', payload);
-    return response.data;
-  },
-
-  // Application
-  submitApplication: async (citizenId, schemeId, documentsUrl) => {
-    const response = await apiClient.post('/application/apply', {
-      citizen_id: citizenId,
-      scheme_id: schemeId,
-      documents_url: documentsUrl,
-    });
-    return response.data;
-  },
-
-  getApplicationStatus: async (trackingCode) => {
-    const response = await apiClient.get(`/application/status/${trackingCode}`);
     return response.data;
   },
 };

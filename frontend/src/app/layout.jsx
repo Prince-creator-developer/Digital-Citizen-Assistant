@@ -37,6 +37,11 @@ export default function RootLayout({ children }) {
         <VoiceAssistantModal
           isOpen={isVoiceModalOpen}
           onClose={() => setIsVoiceModalOpen(false)}
+          onTranscriptReceived={(text) => {
+            if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+              window.location.href = `/?search=${encodeURIComponent(text)}`;
+            }
+          }}
         />
 
         {/* Government Branding Footer */}
