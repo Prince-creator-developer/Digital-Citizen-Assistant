@@ -240,29 +240,73 @@ def _parse_land_record(text: str) -> dict:
 
 
 def _parse_caste_certificate(text: str) -> dict:
-    """Parse Caste / Community Certificate."""
+    """
+    Parse Caste / Community Certificate (supports Bihar Form-IV, UP, MP, Central Govt formats).
+    Correctly identifies OBC/BC/EBC/SC/ST categories without confusing boilerplate legal act references.
+    """
     result = {"document_type": "Caste / Community Certificate"}
 
-    # Name
-    name_match = re.search(r'(?:Name|नाम|certify that|प्रमाणित किया जाता है)[:\s\-]*(?:Shri|Smt|Km|श्री|श्रीमती)?\s*([A-Za-z\u0900-\u097F\s]{3,40})', text, re.IGNORECASE)
-    if name_match:
-        result["name"] = name_match.group(1).strip()
-
-    # Category / Caste
-    cat_match = re.search(r'\b(SC|ST|OBC|General|EWS|Scheduled Caste|Scheduled Tribe|Other Backward Class|अनुसूचित जाति|अनुसूचित जनजाति|अन्य पिछड़ा वर्ग)\b', text, re.IGNORECASE)
-    if cat_match:
-        result["reservation_category"] = cat_match.group(1).upper()
-
-    caste_match = re.search(r'(?:Caste|Community|जाति|समुदाय)[:\s\-]+([A-Za-z\u0900-\u097F\s]{2,40})', text, re.IGNORECASE)
-    if caste_match:
-        result["caste_community"] = caste_match.group(1).strip()
-
-    # Certificate Number
-    cert_match = re.search(r'(?:Certificate No|Cert No|प्रमाण पत्र क्रमांक|क्रमांक)[:\s\-\.]*([A-Za-z0-9\/\-_]+)', text, re.IGNORECASE)
+    # 1. Certificate Number
+    cert_match = re.search(r'(?:प्रमाण-?पत्र संख्या|Certificate No|क्रमांक|Cert No)[:\s\-\.]*([A-Za-z0-9\/\-_]+)', text)
     if cert_match:
         result["certificate_number"] = cert_match.group(1).strip()
 
-    result["issuing_authority"] = "Office of Tehsildar / Sub-Divisional Magistrate (SDM)"
+    # 2. Name Extraction (cleanly handles 'प्रमाणित किया जाता है कि ...')
+    name_m = re.search(r'(?:प्रमाणित किया जाता है कि|certify that(?: Shri| Smt| Km)?|Name[:\s\-]+)\s*([A-Za-z\u0900-\u097F\s\(\)]+?)(?:,|\s+पिता|\s+माता|\s+Father|\s+Mother|\s+S/O|\s+D/O|\s+W/O)', text)
+    if name_m:
+        raw_name = name_m.group(1).strip()
+        # Clean leading particles
+        raw_name = re.sub(r'^(?:कि|की|श्री|श्रीमती|Shri|Smt|Km)\s+', '', raw_name).strip()
+        result["name"] = raw_name
+    else:
+        # Fallback Name Regex
+        fallback_name = re.search(r'(?:Name|नाम)[:\s\-]+([A-Za-z\u0900-\u097F\s]{3,40})', text)
+        if fallback_name:
+            result["name"] = fallback_name.group(1).strip()
+
+    # 3. Caste / Community Extraction
+    # Pattern: '... यादव ( ग्वाला ) समुदाय के सदस्य' or 'जाति/समुदाय: ...'
+    caste_m = re.search(r'([A-Za-z\u0900-\u097F\s\(\)]+?)\s+समुदाय के सदस्य', text)
+    if caste_m:
+        caste_val = caste_m.group(1).strip()
+        caste_val = re.sub(r'^(?:राज्य|बिहार|प्रदेश|के)\s*', '', caste_val).strip()
+        result["caste_community"] = caste_val
+    else:
+        c_m = re.search(r'(?:जाति|समुदाय|Caste|Community)[:\s\-]+([A-Za-z\u0900-\u097F\s\(\)]{2,40})', text)
+        if c_m:
+            result["caste_community"] = c_m.group(1).strip()
+
+    # 4. Reservation Category (OBC / BC / EBC / SC / ST / EWS)
+    # Check title / header and specific reservation schedule text
+    is_obc_bc = bool(re.search(
+        r'(?:पिछड़ा वर्ग का जाति प्रमाण-?पत्र|Caste Certificate of BC|Caste Certificate of OBC|Caste Certificate of EBC|अत्यंत पिछड़ा वर्ग|Other Backward Class|OBC|EBC|BC\s*Certificate|पिछड़ा वर्ग)',
+        text,
+        re.IGNORECASE
+    ))
+
+    if is_obc_bc:
+        if 'अनुसूची -2' in text or 'अनुसूची-2' in text or 'BC-2' in text or 'BC-II' in text or 'Caste Certificate of BC' in text:
+            result["reservation_category"] = "OBC / BC (पिछड़ा वर्ग - अनुसूची 2)"
+        elif 'अनुसूची -1' in text or 'अनुसूची-1' in text or 'EBC' in text or 'अत्यंत पिछड़ा' in text:
+            result["reservation_category"] = "EBC / OBC (अत्यंत पिछड़ा वर्ग - अनुसूची 1)"
+        else:
+            result["reservation_category"] = "OBC (अन्य पिछड़ा वर्ग)"
+    elif 'अनुसूचित जनजाति' in text or 'Scheduled Tribe' in text or 'ST Certificate' in text:
+        result["reservation_category"] = "ST (अनुसूचित जनजाति)"
+    elif 'अनुसूचित जाति' in text or 'Scheduled Caste' in text or 'SC Certificate' in text:
+        result["reservation_category"] = "SC (अनुसूचित जाति)"
+    elif 'EWS' in text or 'आर्थिक रूप से कमजोर' in text:
+        result["reservation_category"] = "EWS (आर्थिक रूप से कमजोर वर्ग)"
+    else:
+        result["reservation_category"] = "General"
+
+    # State & Issuing Authority
+    if 'बिहार' in text or 'Bihar' in text:
+        result["state"] = "Bihar"
+        result["issuing_authority"] = "Revenue Officer / Tehsildar (राजस्व अधिकारी / अंचल संपतचक, पटना)"
+    else:
+        result["issuing_authority"] = "Office of Tehsildar / Sub-Divisional Magistrate (SDM)"
+
     result["verification_source"] = "EasyOCR Dual-Language Neural Engine"
     return result
 

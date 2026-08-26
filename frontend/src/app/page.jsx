@@ -32,12 +32,13 @@ export default function Home() {
     fetchSchemes();
   }, [selectedCategory]);
 
-  const fetchSchemes = async (queryText = searchQuery) => {
+  const fetchSchemes = async (queryText = searchQuery, category = selectedCategory) => {
     setLoading(true);
     try {
-      const categoryParam = selectedCategory === 'ALL' ? null : selectedCategory;
+      const isSpecificQuery = Boolean(queryText && queryText.trim().length > 0);
+      const categoryParam = isSpecificQuery ? null : (category === 'ALL' ? null : category);
 
-      // Use category-specific query text for better results
+      // Use category-specific query text for better results if no specific search query
       const categoryQueries = {
         'Farmers': 'agricultural farmer crop income subsidy irrigation',
         'Elders': 'senior citizen old age pension elderly welfare assistance',
@@ -47,7 +48,9 @@ export default function Home() {
         'Artisans': 'artisan craftsperson handicraft weaver skill toolkit loan',
       };
 
-      const effectiveQuery = queryText || (categoryParam ? categoryQueries[categoryParam] : 'government welfare schemes for Indian citizens');
+      const effectiveQuery = isSpecificQuery
+        ? queryText.trim()
+        : (categoryParam ? categoryQueries[categoryParam] : 'government welfare schemes for Indian citizens');
 
       const res = await apiService.unifiedEvaluate(effectiveQuery, {
         age: 42,
@@ -73,11 +76,11 @@ export default function Home() {
     }
   };
 
-
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    fetchSchemes(searchQuery);
+    setSelectedCategory('ALL');
+    fetchSchemes(searchQuery, 'ALL');
   };
 
   const categoryPills = [
@@ -233,7 +236,8 @@ export default function Home() {
         onClose={() => setIsVoiceOpen(false)}
         onTranscriptReceived={(text) => {
           setSearchQuery(text);
-          fetchSchemes(text);
+          setSelectedCategory('ALL');
+          fetchSchemes(text, 'ALL');
           setIsVoiceOpen(false);
         }}
       />
