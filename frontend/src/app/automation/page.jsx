@@ -1,353 +1,370 @@
 'use client';
-import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Cpu, Upload, CheckCircle2, FileText, ArrowRight, ShieldCheck, FileCheck, User, CreditCard, AlertTriangle } from 'lucide-react';
-import apiService from '../../services/api';
+import React, { useState, useRef } from 'react';
+import {
+  Upload, FileText, Scan, CheckCircle2, AlertTriangle, Loader2,
+  User, Calendar, MapPin, CreditCard, Building2, FileCheck,
+  Download, Eye, ChevronRight, Sparkles, Shield
+} from 'lucide-react';
+import axios from 'axios';
 
-// Verhoeff Algorithm multiplication and permutation tables for official Aadhaar checksum validation
-const dTable = [
-  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-  [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
-  [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
-  [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
-  [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
-  [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
-  [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
-  [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
-  [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
-  [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+
+const DOC_TYPES = [
+  {
+    id: 'aadhaar',
+    label: 'Aadhaar Card',
+    labelHi: 'आधार कार्ड',
+    icon: CreditCard,
+    color: 'from-blue-500 to-indigo-600',
+    bg: 'bg-blue-50',
+    border: 'border-blue-200',
+    description: 'UIDAI-issued 12-digit identity card',
+    fields: ['name', 'date_of_birth', 'gender', 'address', 'id_number', 'id_masked']
+  },
+  {
+    id: 'land_record',
+    label: 'Land Record',
+    labelHi: 'भूमि अभिलेख (खसरा/खतौनी)',
+    icon: MapPin,
+    color: 'from-emerald-500 to-teal-600',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-200',
+    description: 'Khasra/Khatauni land ownership document',
+    fields: ['owner_name', 'khasra_number', 'land_area', 'village', 'district']
+  },
+  {
+    id: 'caste_certificate',
+    label: 'Caste Certificate',
+    labelHi: 'जाति प्रमाण पत्र',
+    icon: Shield,
+    color: 'from-violet-500 to-purple-600',
+    bg: 'bg-violet-50',
+    border: 'border-violet-200',
+    description: 'SC/ST/OBC community certificate for reservations',
+    fields: ['name', 'caste_community', 'reservation_category', 'certificate_number', 'issuing_authority']
+  },
+  {
+    id: 'income_certificate',
+    label: 'Income Certificate',
+    labelHi: 'आय प्रमाण पत्र',
+    icon: FileText,
+    color: 'from-amber-500 to-orange-600',
+    bg: 'bg-amber-50',
+    border: 'border-amber-200',
+    description: 'Annual income certificate for scheme eligibility',
+    fields: ['name', 'annual_income', 'financial_year', 'issuing_authority']
+  },
 ];
 
-const pTable = [
-  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-  [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
-  [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
-  [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
-  [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
-  [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
-  [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
-  [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]
-];
-
-function validateAadhaarVerhoeff(aadhaarString) {
-  const cleanNum = aadhaarString.replace(/[\s-]/g, '');
-  
-  // Must be exactly 12 numeric digits
-  if (!/^\d{12}$/.test(cleanNum)) {
-    return { valid: false, reason: "Aadhaar must be exactly 12 numeric digits." };
-  }
-  
-  // Reject repetitive invalid numbers like 000000000000 or 111111111111
-  if (/^(\d)\1{11}$/.test(cleanNum)) {
-    return { valid: false, reason: "Invalid Aadhaar: Repeating digits pattern rejected." };
-  }
-
-  // Perform Verhoeff Checksum calculation
-  let c = 0;
-  const invertedArray = cleanNum.split('').map(Number).reverse();
-  for (let i = 0; i < invertedArray.length; i++) {
-    c = dTable[c][pTable[i % 8][invertedArray[i]]];
-  }
-  
-  if (c === 0) {
-    return { valid: true, reason: "Valid 12-Digit Verhoeff Checksum (UIDAI Standard)" };
-  } else {
-    return { valid: false, reason: "Checksum Mismatch: Verhoeff algorithm check failed." };
-  }
-}
+const FIELD_LABELS = {
+  name: { label: 'Full Name', icon: User },
+  owner_name: { label: 'Owner Name', icon: User },
+  date_of_birth: { label: 'Date of Birth', icon: Calendar },
+  gender: { label: 'Gender', icon: User },
+  address: { label: 'Address', icon: MapPin },
+  id_number: { label: 'Aadhaar Number', icon: CreditCard },
+  id_masked: { label: 'Aadhaar (Masked)', icon: CreditCard },
+  khasra_number: { label: 'Khasra / Survey No', icon: FileText },
+  land_area: { label: 'Land Area', icon: MapPin },
+  village: { label: 'Village / Gram', icon: MapPin },
+  district: { label: 'District', icon: Building2 },
+  caste_community: { label: 'Caste / Community', icon: Shield },
+  reservation_category: { label: 'Category (SC/ST/OBC)', icon: Shield },
+  certificate_number: { label: 'Certificate Number', icon: FileCheck },
+  annual_income: { label: 'Annual Income', icon: FileText },
+  financial_year: { label: 'Financial Year', icon: Calendar },
+  issuing_authority: { label: 'Issuing Authority', icon: Building2 },
+  verification_source: { label: 'Verification Method', icon: Scan },
+};
 
 export default function AutomationPage() {
-  const { t } = useTranslation();
-  const [selectedDoc, setSelectedDoc] = useState('aadhaar');
-  const [citizenName, setCitizenName] = useState('');
-  const [aadhaarNum, setAadhaarNum] = useState('');
+  const [selectedDocType, setSelectedDocType] = useState('aadhaar');
   const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [automationResult, setAutomationResult] = useState(null);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef(null);
 
-  const docTypes = [
-    { id: 'aadhaar', label: 'Aadhaar Card', auth: 'UIDAI Govt of India' },
-    { id: 'land_record', label: 'Land Record (Khata / Patta)', auth: 'Revenue Dept' },
-    { id: 'caste_income', label: 'Caste & Income Certificate', auth: 'Tehsildar Office' }
-  ];
+  const selectedDoc = DOC_TYPES.find(d => d.id === selectedDocType);
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+  const handleFile = (f) => {
+    if (!f) return;
+    setFile(f);
+    setResult(null);
+    setError(null);
+    if (f.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => setPreview(e.target.result);
+      reader.readAsDataURL(f);
+    } else {
+      setPreview(null);
     }
   };
 
-  const handleDocumentSubmit = async (e) => {
+  const handleDrop = (e) => {
     e.preventDefault();
-    const finalName = citizenName.trim() || 'Citizen Applicant';
-    const finalAadhaar = aadhaarNum.trim();
+    setDragOver(false);
+    const dropped = e.dataTransfer.files[0];
+    if (dropped) handleFile(dropped);
+  };
 
-    // Perform Strict Aadhaar Checksum Validation if Aadhaar is selected
-    let verhoeffCheck = { valid: true, reason: "Valid Document" };
-    if (selectedDoc === 'aadhaar') {
-      verhoeffCheck = validateAadhaarVerhoeff(finalAadhaar);
-    }
-
+  const handleUpload = async () => {
+    if (!file) return;
     setUploading(true);
-    try {
-      const formData = new FormData();
-      if (file) formData.append('file', file);
-      formData.append('document_type', selectedDoc);
-      formData.append('citizen_name', finalName);
-      formData.append('aadhaar_number', finalAadhaar);
-      formData.append('tracking_code', 'GOV-SIH-998822A');
+    setError(null);
+    setResult(null);
 
-      const res = await apiService.uploadDocument(formData);
-      
-      // Override result with Verhoeff verification status if checksum failed
-      if (!verhoeffCheck.valid) {
-        setAutomationResult({
-          status: 'failed',
-          verification_status: 'REJECTED - Invalid Aadhaar Checksum',
-          verification_score: 0,
-          n8n_execution_id: `n8n-exec-FAILED-${Date.now().toString().slice(-4)}`,
-          extracted_ocr_data: {
-            name: finalName,
-            document_type: 'Aadhaar Card',
-            document_number: finalAadhaar || 'INVALID',
-            issuing_authority: 'UIDAI Security Check',
-            verification_date: new Date().toISOString().split('T')[0]
-          },
-          dbt_eligibility: `❌ Verification Failed: ${verhoeffCheck.reason}`
-        });
-      } else {
-        setAutomationResult(res);
-      }
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('doc_type', selectedDocType);
+    formData.append('citizen_name', '');
+
+    try {
+      const res = await axios.post(`${API_BASE}/api/v1/application/upload-document`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 30000,
+      });
+      setResult(res.data);
     } catch (err) {
-      const activeType = docTypes.find(d => d.id === selectedDoc) || docTypes[0];
-      
-      if (!verhoeffCheck.valid) {
-        setAutomationResult({
-          status: 'failed',
-          verification_status: 'REJECTED - Checksum Validation Failed',
-          verification_score: 0,
-          n8n_execution_id: `n8n-exec-REJECT-${Date.now().toString().slice(-4)}`,
-          extracted_ocr_data: {
-            name: finalName,
-            document_type: activeType.label,
-            document_number: finalAadhaar || 'INVALID',
-            issuing_authority: activeType.auth,
-            verification_date: new Date().toISOString().split('T')[0]
-          },
-          dbt_eligibility: `❌ REJECTED (0% Score): ${verhoeffCheck.reason}`
-        });
-      } else {
-        setAutomationResult({
-          status: 'success',
-          verification_status: 'VERIFIED - UIDAI Verhoeff Checksum Passed',
-          verification_score: 98.5,
-          n8n_execution_id: `n8n-exec-${Date.now().toString().slice(-6)}`,
-          extracted_ocr_data: {
-            name: finalName,
-            document_type: activeType.label,
-            document_number: finalAadhaar.length >= 4 ? `XXXX-XXXX-${finalAadhaar.slice(-4)}` : 'XXXX-XXXX-4402',
-            issuing_authority: activeType.auth,
-            verification_date: new Date().toISOString().split('T')[0]
-          },
-          dbt_eligibility: `✅ Verified (98.5% Score): Verhoeff algorithm passed & Bank Account Linked for ${finalName}`
-        });
-      }
+      setError(err.response?.data?.detail || 'Upload failed. Check if the backend is running on port 8000.');
     } finally {
       setUploading(false);
     }
   };
 
+  const handleDownloadJSON = () => {
+    if (!result) return;
+    const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ocr_${selectedDocType}_${result.tracking_code}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="max-w-4xl mx-auto py-4 space-y-8">
-      
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-govblue-900 via-slate-900 to-govblue-900 rounded-3xl p-6 sm:p-8 text-white shadow-2xl border-2 border-saffron-500/30">
-        <div className="inline-flex items-center space-x-2 px-3 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-bold rounded-full border border-emerald-500/30 mb-3">
-          <Cpu className="w-4 h-4 text-emerald-400" />
-          <span>n8n Workflow Automation & Verhoeff OCR Engine</span>
+    <div className="space-y-8 max-w-5xl mx-auto">
+
+      {/* Header */}
+      <div className="text-center space-y-2">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-govblue-900/10 text-govblue-900 rounded-full text-xs font-bold">
+          <Scan className="w-4 h-4 text-saffron-500" />
+          n8n OCR Automation Engine — Powered by pdfplumber + Tesseract
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-          Automated Document Verification & Verhoeff Checksum Pipeline
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-300 mt-2 max-w-2xl">
-          Verhoeff algorithm validation. n8n workflows verify 12-digit Aadhaar checksums and land records against Direct Benefit Transfer (DBT) standards.
+        <h2 className="text-3xl font-extrabold text-govblue-900">
+          📄 Document OCR Scanner
+        </h2>
+        <p className="text-sm text-slate-500 max-w-2xl mx-auto">
+          Upload any government document (PDF or Image). AI extracts all fields, records to database, and triggers n8n automation workflow.
         </p>
       </div>
 
-      {/* Upload Form */}
-      <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-200 space-y-6">
-        <div className="border-b border-slate-100 pb-4">
-          <h2 className="text-xl font-extrabold text-govblue-900 flex items-center gap-2">
-            <Upload className="w-5 h-5 text-saffron-500" /> Select & Upload Document for Verification
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Supported formats: PDF, JPG, PNG (Max 5MB)
-          </p>
-        </div>
-
-        <form onSubmit={handleDocumentSubmit} className="space-y-5">
-          {/* User Input Name & Aadhaar */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                <User className="w-3.5 h-3.5 text-saffron-500" /> Your Full Name (आवेदक का नाम):
-              </label>
-              <input
-                type="text"
-                value={citizenName}
-                onChange={(e) => setCitizenName(e.target.value)}
-                placeholder="Enter full name (e.g. Priya Sharma)"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-saffron-500 outline-none"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                <CreditCard className="w-3.5 h-3.5 text-saffron-500" /> 12-Digit Aadhaar Number (आधार कार्ड संख्या):
-              </label>
-              <input
-                type="text"
-                value={aadhaarNum}
-                onChange={(e) => setAadhaarNum(e.target.value)}
-                placeholder="Enter valid 12-digit Aadhaar number"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-semibold focus:ring-2 focus:ring-saffron-500 outline-none"
-                required
-              />
-              <span className="text-[10px] text-slate-400 mt-0.5 block">Strict Verhoeff checksum algorithm will validate authenticity.</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              Select Document Type:
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {docTypes.map(doc => (
-                <button
-                  key={doc.id}
-                  type="button"
-                  onClick={() => setSelectedDoc(doc.id)}
-                  className={`p-4 rounded-2xl text-xs font-extrabold border text-left transition-all ${
-                    selectedDoc === doc.id
-                      ? 'bg-govblue-900 text-white border-govblue-900 shadow-md ring-2 ring-saffron-500'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  <FileText className={`w-5 h-5 mb-1.5 ${selectedDoc === doc.id ? 'text-saffron-400' : 'text-slate-500'}`} />
-                  <div>{doc.label}</div>
-                  <span className="text-[10px] font-normal opacity-80 block mt-1">{doc.auth}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              Upload File:
-            </label>
-            <label 
-              htmlFor="file-upload"
-              className="border-2 border-dashed border-slate-300 rounded-3xl p-8 text-center bg-slate-50 hover:bg-slate-100/80 transition-colors cursor-pointer block"
+      {/* Document Type Selector */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {DOC_TYPES.map((doc) => {
+          const IconComp = doc.icon;
+          const isActive = selectedDocType === doc.id;
+          return (
+            <button
+              key={doc.id}
+              onClick={() => { setSelectedDocType(doc.id); setFile(null); setResult(null); setError(null); setPreview(null); }}
+              className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                isActive
+                  ? `bg-gradient-to-br ${doc.color} text-white border-transparent shadow-lg scale-105`
+                  : `${doc.bg} ${doc.border} hover:shadow-md`
+              }`}
             >
-              {file ? (
-                <div className="space-y-2">
-                  <FileCheck className="w-10 h-10 text-emerald-600 mx-auto" />
-                  <p className="text-sm font-extrabold text-emerald-800">
-                    📄 Selected: {file.name} ({Math.round(file.size / 1024)} KB)
-                  </p>
-                  <span className="text-xs text-slate-400">Click to replace file</span>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Upload className="w-10 h-10 text-slate-400 mx-auto animate-bounce" />
-                  <p className="text-sm font-extrabold text-govblue-900">
-                    Click to browse or drag & drop document here
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    n8n OCR will scan text and match with citizen database
-                  </p>
-                </div>
-              )}
-              <input
-                type="file"
-                onChange={handleFileChange}
-                className="hidden"
-                id="file-upload"
-                accept=".pdf,.jpg,.jpeg,.png"
-              />
-            </label>
-          </div>
-
-          <button
-            type="submit"
-            disabled={uploading}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2"
-          >
-            {uploading ? 'Validating Verhoeff Checksum...' : 'Trigger Verification & Verhoeff Check'}
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </form>
+              <IconComp className={`w-6 h-6 mb-2 ${isActive ? 'text-white' : 'text-slate-600'}`} />
+              <div className={`text-xs font-extrabold ${isActive ? 'text-white' : 'text-govblue-900'}`}>{doc.label}</div>
+              <div className={`text-[10px] mt-0.5 ${isActive ? 'text-white/80' : 'text-slate-500'}`}>{doc.labelHi}</div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* n8n Automation Output */}
-      {automationResult && (
-        <div className={`bg-white rounded-3xl p-6 sm:p-8 shadow-xl border-2 space-y-6 ${
-          automationResult.verification_score > 0 ? 'border-emerald-500' : 'border-rose-500'
-        }`}>
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-2">
-              {automationResult.verification_score > 0 ? (
-                <ShieldCheck className="w-6 h-6 text-emerald-600" />
-              ) : (
-                <AlertTriangle className="w-6 h-6 text-rose-600" />
-              )}
-              <div>
-                <h3 className="text-lg font-extrabold text-govblue-900">
-                  {automationResult.verification_score > 0 ? 'Verification Success' : 'Verification Rejected'}
-                </h3>
-                <p className="text-xs text-slate-400 font-mono">Execution ID: {automationResult.n8n_execution_id}</p>
+      <div className="grid md:grid-cols-2 gap-6">
+
+        {/* Upload Area */}
+        <div className="space-y-4">
+          <h3 className="text-base font-extrabold text-govblue-900 flex items-center gap-2">
+            <Upload className="w-4 h-4 text-saffron-500" />
+            Upload {selectedDoc?.label} ({selectedDoc?.labelHi})
+          </h3>
+
+          {/* Drop Zone */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+              dragOver
+                ? 'border-saffron-500 bg-saffron-50'
+                : file
+                ? 'border-emerald-400 bg-emerald-50'
+                : 'border-slate-300 bg-slate-50 hover:border-saffron-400 hover:bg-saffron-50/50'
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.tif,.webp"
+              onChange={(e) => handleFile(e.target.files?.[0])}
+              className="hidden"
+            />
+            {file ? (
+              <div className="space-y-2">
+                {preview ? (
+                  <img src={preview} alt="Preview" className="max-h-40 mx-auto rounded-xl shadow object-contain" />
+                ) : (
+                  <FileText className="w-12 h-12 text-emerald-500 mx-auto" />
+                )}
+                <p className="text-sm font-bold text-emerald-700">{file.name}</p>
+                <p className="text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB — Click to change</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className={`w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br ${selectedDoc?.color} flex items-center justify-center`}>
+                  <Upload className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-700">Drop file here or click to browse</p>
+                  <p className="text-xs text-slate-400 mt-1">Supports: PDF, JPG, PNG, TIFF, BMP, WEBP (max 10MB)</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Upload Button */}
+          <button
+            onClick={handleUpload}
+            disabled={!file || uploading}
+            className={`w-full py-4 rounded-2xl font-extrabold text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
+              !file || uploading
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                : `bg-gradient-to-r ${selectedDoc?.color} text-white hover:opacity-90 hover:shadow-xl`
+            }`}
+          >
+            {uploading ? (
+              <><Loader2 className="w-5 h-5 animate-spin" /> Scanning Document with OCR…</>
+            ) : (
+              <><Scan className="w-5 h-5" /> Extract Fields from {selectedDoc?.label} <ChevronRight className="w-4 h-4" /></>
+            )}
+          </button>
+
+          {error && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-xl text-sm flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Extracted Fields Result */}
+        <div className="space-y-4">
+          <h3 className="text-base font-extrabold text-govblue-900 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-saffron-500" />
+            Extracted Information
+          </h3>
+
+          {!result && !uploading && (
+            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center space-y-3 bg-slate-50">
+              <FileCheck className="w-12 h-12 text-slate-300 mx-auto" />
+              <p className="text-sm text-slate-400 font-semibold">Extracted fields will appear here after upload</p>
+              <div className="text-xs text-slate-400 space-y-1">
+                <p>Fields that will be extracted:</p>
+                {selectedDoc?.fields.map(f => (
+                  <span key={f} className="inline-block bg-slate-100 px-2 py-0.5 rounded-md mr-1 mb-1">
+                    {FIELD_LABELS[f]?.label || f}
+                  </span>
+                ))}
               </div>
             </div>
-            <span className={`px-4 py-1.5 font-extrabold text-xs rounded-full ${
-              automationResult.verification_score > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-            }`}>
-              Score: {automationResult.verification_score}%
-            </span>
-          </div>
+          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
-              <span className="text-[10px] font-extrabold text-slate-400 uppercase">Applicant Name:</span>
-              <p className="text-sm font-extrabold text-slate-800">{automationResult.extracted_ocr_data.name}</p>
+          {uploading && (
+            <div className="border-2 border-saffron-200 rounded-2xl p-8 text-center bg-saffron-50 space-y-4">
+              <Loader2 className="w-12 h-12 text-saffron-500 animate-spin mx-auto" />
+              <div>
+                <p className="text-sm font-bold text-govblue-900">OCR Scanning in Progress…</p>
+                <p className="text-xs text-slate-500 mt-1">Extracting text → Parsing fields → Recording to database</p>
+              </div>
             </div>
+          )}
 
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
-              <span className="text-[10px] font-extrabold text-slate-400 uppercase">Document Type:</span>
-              <p className="text-sm font-extrabold text-govblue-900">{automationResult.extracted_ocr_data.document_type}</p>
+          {result && (
+            <div className="space-y-4">
+              {/* Status Banner */}
+              <div className={`flex items-center gap-3 p-4 rounded-2xl border ${
+                result.ocr_status === 'OCR_COMPLETE'
+                  ? 'bg-emerald-50 border-emerald-200'
+                  : 'bg-amber-50 border-amber-200'
+              }`}>
+                <CheckCircle2 className={`w-6 h-6 flex-shrink-0 ${result.ocr_status === 'OCR_COMPLETE' ? 'text-emerald-600' : 'text-amber-600'}`} />
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-extrabold ${result.ocr_status === 'OCR_COMPLETE' ? 'text-emerald-900' : 'text-amber-900'}`}>
+                    {result.ocr_status === 'OCR_COMPLETE' ? '✅ OCR Extraction Complete' : '⚠️ Demo Mode (Install OCR libraries)'}
+                  </p>
+                  <p className="text-xs text-slate-500 font-mono">{result.tracking_code} • Confidence: {result.confidence_score}%</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDownloadJSON}
+                    className="p-2 bg-white rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+                    title="Download as JSON"
+                  >
+                    <Download className="w-4 h-4 text-slate-600" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Extracted Fields Card */}
+              <div className={`rounded-2xl border-2 overflow-hidden ${selectedDoc?.border}`}>
+                <div className={`bg-gradient-to-r ${selectedDoc?.color} px-4 py-3 flex items-center gap-2`}>
+                  {selectedDoc && <selectedDoc.icon className="w-5 h-5 text-white" />}
+                  <span className="text-white font-extrabold text-sm">{result.document_type}</span>
+                  <span className="ml-auto text-white/80 text-xs">{result.file_format}</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {Object.entries(result.extracted_fields || {}).map(([key, value]) => {
+                    if (key === 'document_type' || key === 'raw_text_length') return null;
+                    const fieldMeta = FIELD_LABELS[key] || { label: key, icon: FileText };
+                    const IconComp = fieldMeta.icon;
+                    return (
+                      <div key={key} className="flex items-start gap-3 px-4 py-3 bg-white hover:bg-slate-50 transition-colors">
+                        <IconComp className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">{fieldMeta.label}</p>
+                          <p className="text-sm font-semibold text-slate-800 break-words">{String(value) || '—'}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Raw Text Preview */}
+              {result.raw_text_preview && (
+                <details className="bg-slate-900 text-slate-300 rounded-2xl overflow-hidden">
+                  <summary className="px-4 py-3 text-xs font-bold cursor-pointer flex items-center gap-2 hover:text-white">
+                    <Eye className="w-4 h-4" /> Raw OCR Text Preview (click to expand)
+                  </summary>
+                  <pre className="px-4 pb-4 text-[10px] font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto">
+                    {result.raw_text_preview}
+                  </pre>
+                </details>
+              )}
+
+              <p className="text-xs text-slate-400 text-center">
+                🔄 {result.n8n_automation}
+              </p>
             </div>
-
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
-              <span className="text-[10px] font-extrabold text-slate-400 uppercase">Aadhaar / ID Number:</span>
-              <p className="text-sm font-mono font-extrabold text-saffron-600">{automationResult.extracted_ocr_data.document_number}</p>
-            </div>
-          </div>
-
-          <div className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 border ${
-            automationResult.verification_score > 0
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              : 'bg-rose-50 border-rose-200 text-rose-800'
-          }`}>
-            {automationResult.verification_score > 0 ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-            ) : (
-              <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
-            )}
-            <span>{automationResult.dbt_eligibility}</span>
-          </div>
+          )}
         </div>
-      )}
-
+      </div>
     </div>
   );
 }

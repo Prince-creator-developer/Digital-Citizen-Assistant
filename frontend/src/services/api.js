@@ -10,6 +10,44 @@ const apiClient = axios.create({
 });
 
 export const apiService = {
+  // Single Unified Assistant Endpoint
+  unifiedEvaluate: async (query, userProfile = null, categoryFilter = null, language = 'hi') => {
+    const response = await apiClient.post('/assistant/evaluate', {
+      query,
+      user_profile: userProfile,
+      category_filter: categoryFilter,
+      language
+    });
+    return response.data;
+  },
+
+  // Aadhaar OTP e-KYC Endpoints
+  generateAadhaarOTP: async (aadhaarNumber, citizenName = 'Citizen Applicant') => {
+    const response = await apiClient.post('/application/aadhaar/generate-otp', {
+      aadhaar_number: aadhaarNumber,
+      citizen_name: citizenName
+    });
+    return response.data;
+  },
+
+  verifyAadhaarOTP: async (refId, otp, aadhaarNumber, citizenName = 'Citizen Applicant') => {
+    const response = await apiClient.post('/application/aadhaar/verify-otp', {
+      ref_id: refId,
+      otp,
+      aadhaar_number: aadhaarNumber,
+      citizen_name: citizenName
+    });
+    return response.data;
+  },
+
+  // Document Upload
+  uploadDocument: async (formData) => {
+    const response = await axios.post(`${API_BASE_URL}/application/apply`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
   // Voice endpoints
   sendAudioSTT: async (audioBlob, languageCode = 'hi-IN') => {
     const formData = new FormData();

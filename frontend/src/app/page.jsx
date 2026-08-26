@@ -23,12 +23,26 @@ export default function Home() {
     setLoading(true);
     try {
       const categoryParam = selectedCategory === 'ALL' ? null : selectedCategory;
-      const res = await apiService.unifiedEvaluate(queryText || 'government schemes for citizens', {
+
+      // Use category-specific query text for better results
+      const categoryQueries = {
+        'Farmers': 'agricultural farmer crop income subsidy irrigation',
+        'Elders': 'senior citizen old age pension elderly welfare assistance',
+        'Children': 'child education scholarship girl savings meal school',
+        'BPL': 'below poverty line BPL ration food housing employment insurance',
+        'Women': 'women maternity health empowerment entrepreneurship welfare',
+        'Artisans': 'artisan craftsperson handicraft weaver skill toolkit loan',
+      };
+
+      const effectiveQuery = queryText || (categoryParam ? categoryQueries[categoryParam] : 'government welfare schemes for Indian citizens');
+
+      const res = await apiService.unifiedEvaluate(effectiveQuery, {
         age: 42,
         annual_income: 140000,
-        occupation: selectedCategory === 'Farmers' ? 'Farmer' : 'Citizen',
+        occupation: categoryParam === 'Farmers' ? 'Farmer' : categoryParam === 'Artisans' ? 'Artisan' : 'Citizen',
         category: 'BPL',
-        state: 'Uttar Pradesh'
+        state: 'Uttar Pradesh',
+        gender: categoryParam === 'Women' ? 'Female' : 'Any',
       }, categoryParam);
 
       setSchemes(res.matched_schemes || []);
@@ -40,43 +54,12 @@ export default function Home() {
       });
     } catch (err) {
       console.error('Error fetching schemes:', err);
-      // Fallback data
-      setSchemes([
-        {
-          id: 1,
-          title: 'PM-KISAN Samman Nidhi Yojana',
-          department: 'Ministry of Agriculture',
-          summary: 'Financial assistance of ₹6,000 per year in three equal installments to farmer families.',
-          category_tag: 'Farmers',
-          benefits: '₹6,000 annually via Direct Benefit Transfer.',
-          match_percentage: 96.5,
-          application_link: 'https://pmkisan.gov.in'
-        },
-        {
-          id: 3,
-          title: 'Indira Gandhi National Old Age Pension Scheme',
-          department: 'Ministry of Rural Development',
-          summary: 'Monthly cash pension assistance for senior citizens living below the poverty line (BPL).',
-          category_tag: 'Elders',
-          benefits: 'Monthly pension of ₹1,000 - ₹1,500.',
-          match_percentage: 93.2,
-          application_link: 'https://nsap.nic.in'
-        },
-        {
-          id: 7,
-          title: 'Antyodaya Anna Yojana (AAY) - BPL Ration',
-          department: 'Ministry of Consumer Affairs',
-          summary: 'Subsidized food grains for poorest BPL households.',
-          category_tag: 'BPL',
-          benefits: '35 kg food grains per family monthly.',
-          match_percentage: 91.8,
-          application_link: 'https://nfsa.gov.in'
-        }
-      ]);
+      setSchemes([]);
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
