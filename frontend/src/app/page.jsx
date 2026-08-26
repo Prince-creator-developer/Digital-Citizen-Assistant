@@ -16,6 +16,19 @@ export default function Home() {
   const [searchMeta, setSearchMeta] = useState(null);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlSearch = params.get('search');
+      const urlCategory = params.get('category');
+      if (urlCategory) {
+        setSelectedCategory(urlCategory);
+      }
+      if (urlSearch) {
+        setSearchQuery(urlSearch);
+        fetchSchemes(urlSearch);
+        return;
+      }
+    }
     fetchSchemes();
   }, [selectedCategory]);
 

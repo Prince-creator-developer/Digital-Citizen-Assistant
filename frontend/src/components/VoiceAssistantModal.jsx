@@ -1,8 +1,12 @@
 'use client';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Mic, MicOff, Volume2, Sparkles, CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
+import {
+  X, Mic, MicOff, Volume2, VolumeX, Sparkles, CheckCircle,
+  Loader2, AlertTriangle, ChevronRight, ExternalLink, Award, ArrowRight
+} from 'lucide-react';
+import apiService from '../services/api';
 
-// 22 Official Indian Languages
+// 22 Official Indian Languages (8th Schedule)
 export const INDIAN_LANGUAGES = [
   { code: 'hi-IN', label: 'हिंदी (Hindi)', short: 'hi' },
   { code: 'bn-IN', label: 'বাংলা (Bengali)', short: 'bn' },
@@ -28,13 +32,15 @@ export const INDIAN_LANGUAGES = [
   { code: 'en-IN', label: 'English (India)', short: 'en' },
 ];
 
-export default function VoiceAssistantModal({ isOpen, onClose, onTranscriptReceived }) {
+export default function VoiceAssistantModal({ isOpen, onClose, onTranscriptReceived, onSchemeSelect }) {
   const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState(null);
   const [selectedLang, setSelectedLang] = useState('hi-IN');
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [matchedSchemes, setMatchedSchemes] = useState([]);
+  const [searchMeta, setSearchMeta] = useState(null);
   const [waveAmplitudes, setWaveAmplitudes] = useState([20, 20, 20, 20, 20, 20, 20, 20]);
 
   const recognitionRef = useRef(null);
@@ -58,7 +64,7 @@ export default function VoiceAssistantModal({ isOpen, onClose, onTranscriptRecei
   const startWaveAnimation = useCallback(() => {
     waveIntervalRef.current = setInterval(() => {
       setWaveAmplitudes(Array.from({ length: 8 }, () => Math.floor(Math.random() * 50) + 10));
-    }, 150);
+    }, 120);
   }, []);
 
   useEffect(() => {
@@ -71,6 +77,20 @@ export default function VoiceAssistantModal({ isOpen, onClose, onTranscriptRecei
     };
   }, [stopAllAudio, stopWaveAnimation]);
 
+  // Auto-start listening on open
+  useEffect(() => {
+    if (isOpen) {
+      setTranscript('');
+      setMatchedSchemes([]);
+      setError(null);
+      setTimeout(() => {
+        startRecording();
+      }, 300);
+    } else {
+      handleClose();
+    }
+  }, [isOpen]);
+
   const handleClose = () => {
     stopAllAudio();
     stopWaveAnimation();
@@ -78,20 +98,18 @@ export default function VoiceAssistantModal({ isOpen, onClose, onTranscriptRecei
       try { recognitionRef.current.stop(); } catch (_) {}
     }
     setIsRecording(false);
-    setTranscript('');
-    setError(null);
+    setIsSearching(false);
     if (onClose) onClose();
   };
 
-  const speakResponse = useCallback((text) => {
+  const speakText = useCallback((text) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     stopAllAudio();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = selectedLang;
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
+    utterance.rate = 0.88;
+    utterance.pitch = 1.0;
 
-    // Try to pick a voice matching the language
     const voices = window.speechSynthesis.getVoices();
     const matchedVoice = voices.find(v => v.lang.startsWith(selectedLang.split('-')[0]));
     if (matchedVoice) utterance.voice = matchedVoice;
@@ -102,206 +120,355 @@ export default function VoiceAssistantModal({ isOpen, onClose, onTranscriptRecei
     window.speechSynthesis.speak(utterance);
   }, [selectedLang, stopAllAudio]);
 
+  const executeVoiceSearch = async (queryText) => {
+    if (!queryText || !queryText.trim()) return;
+    setIsSearching(true);
+    setError(null);
+
+    try {
+      const res = await apiService.unifiedEvaluate(
+        queryText,
+        {
+          age: 40,
+          annual_income: 140000,
+          occupation: 'Citizen',
+          category: 'BPL',
+          state: 'Uttar Pradesh'
+        },
+        null,
+        selectedLang.split('-')[0]
+      );
+
+      const schemes = res.matched_schemes || [];
+      setMatchedSchemes(schemes);
+      setSearchMeta({
+        latency: res.latency_ms,
+        count: schemes.length
+      });
+
+      // Prepare voice response announcing results
+      if (schemes.length > 0) {
+        const topScheme = schemes[0];
+        const secondScheme = schemes[1];
+        let speechMsg = '';
+
+        if (selectedLang.startsWith('hi')) {
+          speechMsg = `आपकी खोज के लिए हमें ${schemes.length} सरकारी योजनाएं मिली हैं। मुख्य योजना है: ${topScheme.title}। ${topScheme.summary ? topScheme.summary.slice(0, 100) : ''}`;
+        } else if (selectedLang.startsWith('kn')) {
+          speechMsg = `ನಿಮ್ಮ ಹುಡುಕಾಟಕ್ಕೆ ${schemes.length} ಯೋಜನೆಗಳು ದೊರೆತಿವೆ: ${topScheme.title}`;
+        } else if (selectedLang.startsWith('ta')) {
+          speechMsg = `உங்கள் தேடலுக்கு ${schemes.length} திட்டங்கள் கிடைத்துள்ளன: ${topScheme.title}`;
+        } else if (selectedLang.startsWith('te')) {
+          speechMsg = `మీ శోధన కోసం ${schemes.length} పథకాలు కనుగొనబడ్డాయి: ${topScheme.title}`;
+        } else {
+          speechMsg = `Found ${schemes.length} government schemes for your query. Top scheme is: ${topScheme.title}.`;
+        }
+
+        speakText(speechMsg);
+      } else {
+        const noMsg = selectedLang.startsWith('hi')
+          ? 'इस विषय पर कोई योजना नहीं मिली। कृपया पुनः प्रयास करें।'
+          : 'No schemes found for this query. Please try another search.';
+        speakText(noMsg);
+      }
+
+      // Notify parent page if callback available
+      if (onTranscriptReceived) {
+        onTranscriptReceived(queryText);
+      }
+    } catch (err) {
+      console.error('Voice search error:', err);
+      setError('योजनाएं खोजने में समस्या आई। कृपया पुनः प्रयास करें।');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const startRecording = useCallback(() => {
+    stopAllAudio();
     setError(null);
     setTranscript('');
+    setMatchedSchemes([]);
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      setError('Your browser does not support voice recognition. Please use Chrome or Edge.');
+      setError('Your browser does not support Web Speech API. Please use Chrome, Edge, or Brave.');
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = selectedLang;
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    let capturedFinal = '';
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = selectedLang;
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+      recognitionRef.current = recognition;
 
-    recognition.onstart = () => {
-      setIsRecording(true);
-      startWaveAnimation();
-    };
+      let capturedText = '';
 
-    recognition.onresult = (event) => {
-      let interimTranscript = '';
-      let finalTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalTranscript += result[0].transcript;
-        } else {
-          interimTranscript += result[0].transcript;
-        }
-      }
-      capturedFinal = finalTranscript || interimTranscript;
-      setTranscript(capturedFinal);
-    };
-
-    recognition.onend = () => {
-      setIsRecording(false);
-      setIsProcessing(true);
-      stopWaveAnimation();
-
-      const finalText = capturedFinal || 'सरकारी योजना की जानकारी दें';
-      setTranscript(finalText);
-
-      // Speak back a response in the selected language
-      const responses = {
-        'hi-IN': `आपकी खोज "${finalText.slice(0, 30)}" के लिए योजनाएं खोजी जा रही हैं।`,
-        'kn-IN': `"${finalText.slice(0, 20)}" ಗಾಗಿ ಯೋಜನೆಗಳನ್ನು ಹುಡುಕಲಾಗುತ್ತಿದೆ।`,
-        'ta-IN': `"${finalText.slice(0, 20)}" க்கான திட்டங்கள் தேடப்படுகின்றன।`,
-        'te-IN': `"${finalText.slice(0, 20)}" కోసం పథకాలు వెతుకుతున్నాము।`,
-        'mr-IN': `"${finalText.slice(0, 20)}" साठी योजना शोधत आहोत।`,
-        'ml-IN': `"${finalText.slice(0, 20)}" നായി പദ്ധതികൾ തിരയുന്നു.`,
-        'bn-IN': `"${finalText.slice(0, 20)}" এর জন্য প্রকল্প খোঁজা হচ্ছে।`,
-        'en-IN': `Searching schemes for "${finalText.slice(0, 30)}".`,
+      recognition.onstart = () => {
+        setIsRecording(true);
+        startWaveAnimation();
       };
-      const responseText = responses[selectedLang] || responses['hi-IN'];
-      speakResponse(responseText);
 
-      // Wait for TTS to finish, then trigger search and close
-      setTimeout(() => {
-        speakResponse(responseText);
-        setIsProcessing(false);
-      }, 500);
-    };
+      recognition.onresult = (event) => {
+        let interim = '';
+        let final = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            final += res[0].transcript;
+          } else {
+            interim += res[0].transcript;
+          }
+        }
+        capturedText = final || interim;
+        setTranscript(capturedText);
+      };
 
-    recognition.onerror = (event) => {
+      recognition.onerror = (e) => {
+        setIsRecording(false);
+        stopWaveAnimation();
+        if (e.error !== 'no-speech') {
+          setError(`Microphone error: ${e.error}. Please allow microphone access.`);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+        stopWaveAnimation();
+        const queryToSearch = capturedText.trim() || 'सरकारी योजनाएं किसान पेंशन राशन';
+        setTranscript(queryToSearch);
+        executeVoiceSearch(queryToSearch);
+      };
+
+      recognition.start();
+    } catch (err) {
       setIsRecording(false);
-      setIsProcessing(false);
       stopWaveAnimation();
-      if (event.error === 'no-speech') {
-        setError('No speech detected. Please try again and speak clearly.');
-      } else if (event.error === 'not-allowed') {
-        setError('Microphone access denied. Please allow microphone in browser settings.');
-      } else {
-        setError(`Voice error: ${event.error}. Please try again.`);
-      }
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-  }, [selectedLang, transcript, onTranscriptReceived, speakResponse, startWaveAnimation, stopWaveAnimation]);
-
-  const stopRecording = useCallback(() => {
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch (_) {}
+      setError('Microphone initialization failed.');
     }
-    setIsRecording(false);
-    stopWaveAnimation();
-  }, [stopWaveAnimation]);
+  }, [selectedLang, startWaveAnimation, stopWaveAnimation, stopAllAudio]);
+
+  const handleManualSearch = (text) => {
+    setTranscript(text);
+    executeVoiceSearch(text);
+  };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="relative bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border-4 border-saffron-500 overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+      <div className="relative bg-white rounded-3xl max-w-2xl w-full shadow-2xl border-4 border-saffron-500 overflow-hidden my-6">
 
-        {/* Close */}
-        <button onClick={handleClose}
-          className="absolute top-4 right-4 w-9 h-9 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full flex items-center justify-center transition-colors">
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Header */}
-        <div className="text-center space-y-2 mb-5">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 bg-saffron-500/10 text-saffron-600 rounded-full text-xs font-bold">
-            <Sparkles className="w-4 h-4" />
-            <span>AI Voice Engine — Web Speech API</span>
+        {/* Modal Header */}
+        <div className="bg-gradient-to-r from-govblue-900 via-slate-900 to-govblue-900 px-6 py-4 flex items-center justify-between text-white border-b-2 border-saffron-500">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-tr from-saffron-500 to-amber-500 rounded-xl flex items-center justify-center shadow-lg">
+              <Sparkles className="w-5 h-5 text-govblue-900" />
+            </div>
+            <div>
+              <h2 className="text-base font-extrabold flex items-center gap-2">
+                वॉइस स्कीम फाइंडर (Voice Assistant)
+                <span className="text-[10px] bg-saffron-500 text-govblue-900 px-2 py-0.5 rounded-full uppercase font-black">
+                  AI Live
+                </span>
+              </h2>
+              <p className="text-xs text-slate-300">22 भारतीय भाषाएं • Llama 3 + PostgreSQL Vector Match</p>
+            </div>
           </div>
-          <h3 className="text-xl font-extrabold text-govblue-900">
-            🎙️ Voice Assistant (वॉयस असिस्टेंट)
-          </h3>
-          <p className="text-xs text-slate-500">
-            Speak in any of 22 Indian languages to search government schemes
-          </p>
+
+          <button
+            onClick={handleClose}
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Language Selector */}
-        <div className="mb-5">
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-            🌐 Select Your Language (भाषा चुनें):
-          </label>
+        {/* Language Selector Bar */}
+        <div className="px-6 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-600">🌐 भाषा चुनें (Language):</span>
           <select
             value={selectedLang}
-            onChange={(e) => { setSelectedLang(e.target.value); stopAllAudio(); }}
-            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-saffron-500 outline-none"
+            onChange={(e) => {
+              setSelectedLang(e.target.value);
+              stopAllAudio();
+            }}
+            className="text-xs font-extrabold bg-white border border-slate-300 rounded-xl px-3 py-1 text-govblue-900 outline-none cursor-pointer"
           >
-            {INDIAN_LANGUAGES.map(lang => (
-              <option key={lang.code} value={lang.code}>{lang.label}</option>
+            {INDIAN_LANGUAGES.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.label}
+              </option>
             ))}
           </select>
         </div>
 
-        {/* Waveform Visualizer */}
-        <div className="flex items-center justify-center gap-1 h-16 mb-6">
-          {waveAmplitudes.map((amp, i) => (
-            <div
-              key={i}
-              className={`w-2.5 rounded-full transition-all duration-150 ${
-                isRecording ? 'bg-saffron-500' : isSpeaking ? 'bg-emerald-500' : 'bg-slate-200'
+        {/* Voice Visualizer / Mic Status */}
+        <div className="p-6 text-center space-y-4">
+          
+          {/* Animated Waveform Bars */}
+          <div className="h-16 flex items-center justify-center space-x-2">
+            {waveAmplitudes.map((amp, idx) => (
+              <div
+                key={idx}
+                style={{ height: `${amp}px` }}
+                className={`w-2.5 rounded-full transition-all duration-150 ${
+                  isRecording
+                    ? 'bg-gradient-to-t from-saffron-500 to-amber-400 shadow-md shadow-saffron-500/50'
+                    : isSpeaking
+                    ? 'bg-gradient-to-t from-emerald-500 to-teal-400'
+                    : 'bg-slate-200'
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Action Mic Button */}
+          <div className="flex justify-center">
+            <button
+              onClick={isRecording ? () => recognitionRef.current?.stop() : startRecording}
+              className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-2xl transition-all ${
+                isRecording
+                  ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse scale-110'
+                  : isSearching
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-gradient-to-tr from-saffron-500 to-amber-600 hover:from-saffron-600 hover:to-amber-700 text-white hover:scale-105'
               }`}
-              style={{ height: `${isRecording || isSpeaking ? amp : 20}px` }}
-            />
-          ))}
-        </div>
+            >
+              {isSearching ? (
+                <Loader2 className="w-8 h-8 animate-spin text-white" />
+              ) : isRecording ? (
+                <MicOff className="w-8 h-8 text-white" />
+              ) : (
+                <Mic className="w-8 h-8 text-white" />
+              )}
+            </button>
+          </div>
 
-        {/* Mic Button */}
-        <div className="flex flex-col items-center gap-4">
-          {!isRecording ? (
-            <button
-              onClick={startRecording}
-              disabled={isProcessing}
-              className="w-20 h-20 rounded-full bg-gradient-to-br from-saffron-500 to-amber-600 hover:from-saffron-600 hover:to-amber-700 text-white shadow-2xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-            >
-              {isProcessing
-                ? <Loader2 className="w-9 h-9 animate-spin" />
-                : <Mic className="w-9 h-9" />
-              }
-            </button>
-          ) : (
-            <button
-              onClick={stopRecording}
-              className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-2xl flex items-center justify-center transition-all animate-pulse"
-            >
-              <MicOff className="w-9 h-9" />
-            </button>
-          )}
-          <p className="text-xs font-bold text-slate-500">
-            {isRecording ? '🔴 Recording… Click to Stop'
-              : isProcessing ? '⏳ Processing your voice…'
-              : isSpeaking ? '🔊 Speaking response…'
-              : '👆 Tap mic to start speaking'}
+          {/* Status Text */}
+          <p className="text-xs font-extrabold text-slate-500">
+            {isRecording
+              ? '🎙️ सुन रहे हैं… कृपया अपनी भाषा में बोलें (Listening... Speak now)'
+              : isSearching
+              ? '🔍 आपकी पात्रता एवं योजनाएं खोजी जा रही हैं… (Searching matching schemes...)'
+              : isSpeaking
+              ? '🔊 AI सहायक उत्तर दे रहा है (Voice response playing...)'
+              : 'माइक दबाएं और बोलें (Tap mic to speak)'}
           </p>
+
+          {/* Recognized Text Bubble */}
+          {transcript && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-left">
+              <span className="text-[10px] font-extrabold uppercase text-amber-700 block">आपकी आवाज (Recognized Query):</span>
+              <p className="text-sm font-extrabold text-govblue-900 mt-0.5">"{transcript}"</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-2xl text-xs font-semibold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Matched Schemes Results (Inside Modal) */}
+          {matchedSchemes.length > 0 && (
+            <div className="text-left space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-extrabold text-govblue-900 flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4 text-emerald-500" />
+                  पात्र योजनाएं मिलीं (Matched Schemes: {matchedSchemes.length})
+                </h4>
+                {isSpeaking && (
+                  <button
+                    onClick={stopAllAudio}
+                    className="text-xs font-bold text-rose-600 hover:underline flex items-center gap-1"
+                  >
+                    <VolumeX className="w-3.5 h-3.5" /> आवाज रोकें (Mute)
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                {matchedSchemes.map((scheme, idx) => (
+                  <div
+                    key={scheme.id || idx}
+                    className="p-3.5 bg-slate-50 hover:bg-slate-100 rounded-2xl border border-slate-200 transition-all space-y-1.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <h5 className="text-xs font-extrabold text-govblue-900 leading-snug">
+                        {scheme.title}
+                      </h5>
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-extrabold flex-shrink-0">
+                        {scheme.match_percentage || 95}% Match
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-600 line-clamp-2">
+                      {scheme.summary || scheme.benefits}
+                    </p>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] font-bold text-saffron-600 bg-saffron-50 px-2 py-0.5 rounded-md">
+                        🏷️ {scheme.category_tag || 'Welfare'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {scheme.department}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Quick Preset Queries */}
+          <div className="pt-2">
+            <span className="text-[10px] font-bold text-slate-400 block mb-1.5">त्वरित नमूना प्रश्न (Try Sample Queries):</span>
+            <div className="flex flex-wrap gap-1.5 justify-center">
+              {[
+                'किसान फसल बीमा एवं सब्सिडी',
+                'वृद्धावस्था पेंशन 60+ वर्ष',
+                'BPL मुफ्त राशन कार्ड योजना',
+                'सुकन्या समृद्धि बालिका योजना'
+              ].map((chip, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleManualSearch(chip)}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold transition-colors"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+          </div>
+
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mt-4 bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl text-xs flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
+        {/* Modal Footer */}
+        <div className="bg-slate-50 border-t border-slate-200 px-6 py-3.5 flex items-center justify-between">
+          <button
+            onClick={startRecording}
+            className="text-xs font-extrabold text-govblue-900 hover:text-saffron-600 flex items-center gap-1"
+          >
+            <Mic className="w-3.5 h-3.5 text-saffron-500" /> दोबारा बोलें (Speak Again)
+          </button>
 
-        {/* Transcript Result */}
-        {transcript && !error && (
-          <div className="mt-4 bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-              <span className="flex items-center gap-1 text-emerald-600">
-                <CheckCircle className="w-4 h-4" /> Recognized:
-              </span>
-              <button
-                onClick={() => speakResponse(transcript)}
-                className="flex items-center gap-1 text-saffron-600 hover:underline"
-              >
-                <Volume2 className="w-4 h-4" /> Replay
-              </button>
-            </div>
-            <p className="text-sm font-semibold text-slate-800 italic">"{transcript}"</p>
-          </div>
-        )}
+          <button
+            onClick={() => {
+              if (transcript && onTranscriptReceived) {
+                onTranscriptReceived(transcript);
+              }
+              handleClose();
+            }}
+            className="px-4 py-2 bg-govblue-900 hover:bg-govblue-800 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-md"
+          >
+            <span>मुख्य पृष्ठ पर देखें (View on Dashboard)</span>
+            <ArrowRight className="w-3.5 h-3.5 text-saffron-400" />
+          </button>
+        </div>
 
       </div>
     </div>

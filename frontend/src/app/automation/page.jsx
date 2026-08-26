@@ -1,11 +1,13 @@
 'use client';
 import React, { useState, useRef } from 'react';
+import Link from 'next/link';
 import {
   Upload, FileText, Scan, CheckCircle2, AlertTriangle, Loader2,
   User, Calendar, MapPin, CreditCard, Building2, FileCheck,
-  Download, Eye, ChevronRight, Sparkles, Shield
+  Download, Eye, ChevronRight, Sparkles, Shield, FolderLock
 } from 'lucide-react';
 import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
@@ -78,6 +80,7 @@ const FIELD_LABELS = {
 };
 
 export default function AutomationPage() {
+  const { user, token } = useAuth();
   const [selectedDocType, setSelectedDocType] = useState('aadhaar');
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -119,12 +122,19 @@ export default function AutomationPage() {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('doc_type', selectedDocType);
-    formData.append('citizen_name', '');
+    formData.append('citizen_name', user?.name || '');
+    if (user?.id) {
+      formData.append('user_id', user.id);
+    }
 
     try {
+      const headers = { 'Content-Type': 'multipart/form-data' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const res = await axios.post(`${API_BASE}/api/v1/application/upload-document`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 30000,
+        headers,
+        timeout: 45000,
       });
       setResult(res.data);
     } catch (err) {
@@ -299,16 +309,21 @@ export default function AutomationPage() {
             <div className="space-y-4">
               {/* Status Banner */}
               <div className={`flex items-center gap-3 p-4 rounded-2xl border ${
-                result.ocr_status === 'OCR_COMPLETE'
+                result.ocr_status === 'OCR_VERIFIED' || result.ocr_status === 'OCR_COMPLETE'
                   ? 'bg-emerald-50 border-emerald-200'
                   : 'bg-amber-50 border-amber-200'
               }`}>
-                <CheckCircle2 className={`w-6 h-6 flex-shrink-0 ${result.ocr_status === 'OCR_COMPLETE' ? 'text-emerald-600' : 'text-amber-600'}`} />
+                <CheckCircle2 className={`w-6 h-6 flex-shrink-0 ${result.ocr_status === 'OCR_VERIFIED' || result.ocr_status === 'OCR_COMPLETE' ? 'text-emerald-600' : 'text-amber-600'}`} />
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-extrabold ${result.ocr_status === 'OCR_COMPLETE' ? 'text-emerald-900' : 'text-amber-900'}`}>
-                    {result.ocr_status === 'OCR_COMPLETE' ? '✅ OCR Extraction Complete' : '⚠️ Demo Mode (Install OCR libraries)'}
+                  <p className={`text-sm font-extrabold ${result.ocr_status === 'OCR_VERIFIED' || result.ocr_status === 'OCR_COMPLETE' ? 'text-emerald-900' : 'text-amber-900'}`}>
+                    {result.ocr_status === 'OCR_VERIFIED' || result.ocr_status === 'OCR_COMPLETE' ? '✅ OCR Extraction Complete (EasyOCR Verified)' : '⚠️ Document Scanned'}
                   </p>
                   <p className="text-xs text-slate-500 font-mono">{result.tracking_code} • Confidence: {result.confidence_score}%</p>
+                  {result.user_saved && (
+                    <Link href="/profile" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline mt-0.5">
+                      <FolderLock className="w-3.5 h-3.5" /> Saved to your Citizen Vault (View in Profile →)
+                    </Link>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button

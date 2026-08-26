@@ -62,21 +62,67 @@ export default function RegisterPage() {
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
+  const handleNext = () => {
+    setError('');
+    if (step === 0) {
+      if (!form.name.trim()) {
+        setError('कृपया अपना पूरा नाम दर्ज करें (Please enter your name).');
+        return;
+      }
+      if (!form.email.trim() || !form.email.includes('@')) {
+        setError('कृपया सही ईमेल दर्ज करें (Please enter a valid email).');
+        return;
+      }
+      if (!form.phone.trim() || form.phone.trim().length < 10) {
+        setError('कृपया 10 अंकों का मोबाइल नंबर दर्ज करें (Please enter a 10-digit mobile number).');
+        return;
+      }
+      if (!form.password || form.password.length < 6) {
+        setError('पासवर्ड कम से कम 6 अक्षरों का होना चाहिए (Password must be at least 6 characters).');
+        return;
+      }
+    } else if (step === 1) {
+      if (!form.age || parseInt(form.age) < 18) {
+        setError('कृपया वैध आयु (18+ वर्ष) दर्ज करें (Please enter a valid age, 18+).');
+        return;
+      }
+      if (!form.state) {
+        setError('कृपया अपना राज्य चुनें (Please select your state).');
+        return;
+      }
+    }
+    setStep(s => s + 1);
+  };
+
   const handleSubmit = async () => {
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
     try {
       const payload = {
-        ...form,
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        phone: form.phone.trim(),
+        password: form.password,
         age: form.age ? parseInt(form.age) : null,
+        gender: form.gender || 'Male',
+        state: form.state || null,
+        district: form.district ? form.district.trim() : null,
         annual_income: form.annual_income ? parseFloat(form.annual_income) : null,
+        occupation: form.occupation || 'Citizen',
+        category: form.category || 'General',
+        language_preference: form.language_preference || 'hi',
+        is_farmer: Boolean(form.is_farmer),
+        has_ration_card: Boolean(form.has_ration_card),
+        ration_card_type: form.ration_card_type || null,
       };
+
       await register(payload);
-      speak('बधाई हो! आपका खाता बन गया। आपको आपकी योजनाएं दिखाई जाएंगी।');
+      speak('बधाई हो! आपका खाता सफलतापूर्वक बन गया है।');
       router.push('/profile');
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Registration failed. Please try again.';
+      const msg = err.response?.data?.detail || 'Registration failed. Please check your details.';
       setError(msg);
-      speak('पंजीकरण विफल। कृपया दोबारा कोशिश करें।');
+      speak('पंजीकरण विफल। ' + msg);
     } finally {
       setLoading(false);
     }
@@ -293,7 +339,7 @@ export default function RegisterPage() {
               </button>
             )}
             {step < STEPS.length - 1 ? (
-              <button onClick={() => setStep(s => s + 1)}
+              <button onClick={handleNext}
                 className="flex-1 py-3 bg-govblue-900 hover:bg-govblue-800 text-white font-extrabold text-sm rounded-xl flex items-center justify-center gap-1">
                 अगला (Next) <ChevronRight className="w-4 h-4" />
               </button>
