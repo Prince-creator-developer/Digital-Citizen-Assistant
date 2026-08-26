@@ -1,19 +1,22 @@
 'use client';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, ChevronRight, Gift, ExternalLink, FileCheck, X, Building2, User, Phone, CreditCard } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Gift, ExternalLink, FileCheck, X, Building2, User, Phone, CreditCard, Sparkles } from 'lucide-react';
 import apiService from '../services/api';
+import SchemeGuidanceBot from './SchemeGuidanceBot';
 
 export default function SchemeCard({ scheme }) {
   const { t } = useTranslation();
   const [isApplying, setIsApplying] = useState(false);
   const [showApplyModal, setShowApplyModal] = useState(false);
+  const [showGuidanceBot, setShowGuidanceBot] = useState(false);
   
   // Dynamic User Input State
   const [applicantName, setApplicantName] = useState('');
   const [phone, setPhone] = useState('');
   const [aadhaar, setAadhaar] = useState('');
   const [applicationSuccess, setApplicationSuccess] = useState(null);
+
 
   const handleApplySubmit = async (e) => {
     e.preventDefault();
@@ -43,7 +46,8 @@ export default function SchemeCard({ scheme }) {
   };
 
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-md hover:shadow-xl transition-all border border-slate-200 flex flex-col justify-between group relative overflow-hidden">
+    <>
+      <div className="bg-white rounded-3xl p-6 shadow-md hover:shadow-xl transition-all border border-slate-200 flex flex-col justify-between group relative overflow-hidden">
       
       {/* Top Banner Accent */}
       <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-saffron-500 via-white to-emerald-500"></div>
@@ -88,14 +92,13 @@ export default function SchemeCard({ scheme }) {
 
       {/* Action Footer */}
       <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
-        <a
-          href={scheme.application_link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs font-bold text-slate-500 hover:text-govblue-900 flex items-center gap-1"
+        <button
+          onClick={() => setShowGuidanceBot(true)}
+          className="text-xs font-bold text-govblue-900 hover:text-saffron-600 flex items-center gap-1 transition-colors"
+          title="Voice-guided step-by-step registration help"
         >
-          <ExternalLink className="w-3.5 h-3.5" /> Official Link
-        </a>
+          <Sparkles className="w-3.5 h-3.5 text-saffron-500" /> आवेदन गाइड 🎙️
+        </button>
 
         {applicationSuccess ? (
           <div className="text-right">
@@ -226,5 +229,14 @@ export default function SchemeCard({ scheme }) {
       )}
 
     </div>
+
+      {/* GOI Voice Guidance Bot */}
+      {showGuidanceBot && (
+        <SchemeGuidanceBot
+          scheme={scheme}
+          onClose={() => setShowGuidanceBot(false)}
+        />
+      )}
+    </>
   );
 }

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
 import VoiceAssistantModal from '../components/VoiceAssistantModal';
+import { AuthProvider } from '../context/AuthContext';
 import { Mic } from 'lucide-react';
 import '../i18n';
 import './globals.css';
@@ -12,7 +13,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="hi">
       <body className="antialiased font-sans min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-between">
-        
+        <AuthProvider>
         {/* Navigation Bar */}
         <Navbar />
 
@@ -49,7 +50,7 @@ export default function RootLayout({ children }) {
             </p>
           </div>
         </footer>
-
+        </AuthProvider>
       </body>
     </html>
   );

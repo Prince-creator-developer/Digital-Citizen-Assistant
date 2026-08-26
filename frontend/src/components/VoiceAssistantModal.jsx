@@ -117,6 +117,7 @@ export default function VoiceAssistantModal({ isOpen, onClose, onTranscriptRecei
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
+    let capturedFinal = '';
 
     recognition.onstart = () => {
       setIsRecording(true);
@@ -134,7 +135,8 @@ export default function VoiceAssistantModal({ isOpen, onClose, onTranscriptRecei
           interimTranscript += result[0].transcript;
         }
       }
-      setTranscript(finalTranscript || interimTranscript);
+      capturedFinal = finalTranscript || interimTranscript;
+      setTranscript(capturedFinal);
     };
 
     recognition.onend = () => {
@@ -142,10 +144,8 @@ export default function VoiceAssistantModal({ isOpen, onClose, onTranscriptRecei
       setIsProcessing(true);
       stopWaveAnimation();
 
-      const finalText = transcript || 'सरकारी योजना की जानकारी दें';
+      const finalText = capturedFinal || 'सरकारी योजना की जानकारी दें';
       setTranscript(finalText);
-
-      if (onTranscriptReceived) onTranscriptReceived(finalText);
 
       // Speak back a response in the selected language
       const responses = {
@@ -159,6 +159,9 @@ export default function VoiceAssistantModal({ isOpen, onClose, onTranscriptRecei
         'en-IN': `Searching schemes for "${finalText.slice(0, 30)}".`,
       };
       const responseText = responses[selectedLang] || responses['hi-IN'];
+      speakResponse(responseText);
+
+      // Wait for TTS to finish, then trigger search and close
       setTimeout(() => {
         speakResponse(responseText);
         setIsProcessing(false);

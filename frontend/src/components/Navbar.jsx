@@ -2,11 +2,13 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
-import { Sun, Moon, Landmark, Database, Cpu } from 'lucide-react';
+import { Sun, Moon, Landmark, Database, Cpu, LogIn, UserCircle, LogOut } from 'lucide-react';
 import LanguageSelector from './LanguageSelector';
+import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
   const { t } = useTranslation();
+  const { user, logout } = useAuth();
   const [highContrast, setHighContrast] = useState(false);
 
   const toggleHighContrast = () => {
@@ -69,6 +71,26 @@ export default function Navbar() {
             {highContrast ? <Moon className="w-4 h-4 text-amber-300" /> : <Sun className="w-4 h-4 text-amber-300" />}
           </button>
           <LanguageSelector />
+          {user ? (
+            <div className="flex items-center gap-2">
+              <Link href="/profile"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-saffron-500 hover:bg-saffron-600 text-govblue-900 font-extrabold text-xs rounded-xl transition-colors">
+                <UserCircle className="w-4 h-4" />
+                <span className="hidden sm:inline max-w-[80px] truncate">{user.name?.split(' ')[0]}</span>
+              </Link>
+              <button onClick={logout}
+                className="p-2 bg-white/10 hover:bg-rose-500/30 rounded-xl border border-white/20 text-white transition-colors"
+                title="Logout">
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <Link href="/login"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl transition-colors">
+              <LogIn className="w-4 h-4" />
+              <span className="hidden sm:inline">Login</span>
+            </Link>
+          )}
         </div>
 
       </div>

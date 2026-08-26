@@ -3,8 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.db.database import engine, Base
 from app.api import voice, schemes, eligibility, application, assistant
+from app.api import auth as auth_router
+from app.models import user_model  # ensure User table is created
 
-# Initialize database tables
+# Initialize database tables (creates users table too)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -30,6 +32,7 @@ app.include_router(schemes.router, prefix=settings.API_V1_STR)
 app.include_router(eligibility.router, prefix=settings.API_V1_STR)
 app.include_router(application.router, prefix=settings.API_V1_STR)
 app.include_router(assistant.router, prefix=f"{settings.API_V1_STR}/assistant")
+app.include_router(auth_router.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():

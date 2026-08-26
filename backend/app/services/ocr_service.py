@@ -26,18 +26,52 @@ def _extract_text_from_pdf(file_bytes: bytes) -> str:
 
 
 def _extract_text_from_image(file_bytes: bytes) -> str:
-    """Extract raw text from image using pytesseract."""
-    try:
-        from PIL import Image
-        import pytesseract
-        img = Image.open(io.BytesIO(file_bytes))
-        # Try multiple languages: Hindi + English
-        text = pytesseract.image_to_string(img, lang='eng+hin', config='--psm 6')
-        return text.strip()
-    except ImportError:
-        return "[pytesseract/Pillow not installed — pip install pytesseract pillow]"
-    except Exception as e:
-        return f"[Image OCR error: {str(e)}]"
+    """Extract raw text from image using Gemini Vision API (no Tesseract needed)."""
+    import base64
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+
+    if gemini_key:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=gemini_key)
+            model = genai.GenerativeModel("gemini-1.5-flash")
+
+            # Encode image as base64
+            b64_image = base64.b64encode(file_bytes).decode("utf-8")
+            # Detect mime type from first bytes
+            if file_bytes[:4] == b'\x89PNG':
+                mime = "image/png"
+            elif file_bytes[:2] in (b'\xff\xd8',):
+                mime = "image/jpeg"
+            else:
+                mime = "image/jpeg"
+
+            response = model.generate_content([
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": (
+                            "You are an OCR engine. Extract ALL text from this government document image exactly as written. "
+                            "Include every field, number, date, address, and name. "
+                            "Output ONLY the raw extracted text, nothing else."
+                        )},
+                        {"inline_data": {"mime_type": mime, "data": b64_image}}
+                    ]
+                }
+            ])
+            return response.text.strip()
+        except Exception as e:
+            return f"[Gemini Vision error: {str(e)}]"
+    else:
+        # Try pytesseract as fallback
+        try:
+            from PIL import Image
+            import pytesseract
+            img = Image.open(io.BytesIO(file_bytes))
+            text = pytesseract.image_to_string(img, lang='eng+hin', config='--psm 6')
+            return text.strip()
+        except Exception:
+            return "[OCR_NEEDS_KEY: Add GEMINI_API_KEY to backend/.env for image OCR]"
 
 
 def _parse_aadhaar(text: str) -> dict:
@@ -188,8 +222,11 @@ def extract_document(file_bytes: bytes, filename: str, doc_type: str) -> dict:
         file_format = "Unknown"
 
     if not raw_text or raw_text.startswith('['):
-        # OCR failed or lib not installed — return structured mock for demo
-        raw_text = f"DEMO OCR: {doc_type.upper()} document uploaded. OCR libraries required: pip install pdfplumber pytesseract pillow"
+        gemini_key = os.getenv("GEMINI_API_KEY", "")
+        if not gemini_key:
+            raw_text = f"DEMO OCR: {doc_type.upper()} document uploaded. To enable real image OCR, add your GEMINI_API_KEY to backend/.env file."
+        else:
+            raw_text = f"DEMO OCR: {doc_type.upper()} — OCR extraction failed. Please upload a clearer image or valid PDF."
 
     # Step 2: Parse based on doc type
     parsers = {
