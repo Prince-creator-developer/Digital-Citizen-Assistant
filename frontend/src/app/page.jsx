@@ -69,8 +69,9 @@ export default function Home() {
         sources: res.live_web_sources
       });
     } catch (err) {
-      console.error('Error fetching schemes:', err);
-      setSchemes([]);
+      console.warn('Error in fetchSchemes, using fallback:', err);
+      const fallbackRes = await apiService.getSchemes(selectedCategory);
+      setSchemes(Array.isArray(fallbackRes) ? fallbackRes : []);
     } finally {
       setLoading(false);
     }
