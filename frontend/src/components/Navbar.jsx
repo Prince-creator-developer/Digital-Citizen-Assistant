@@ -48,13 +48,13 @@ export default function Navbar() {
             {t('nav_home')}
           </Link>
           <Link href="/vector-search" className="hover:text-saffron-500 transition-colors flex items-center gap-1">
-            <Database className="w-3.5 h-3.5 text-saffron-500" /> Vector Match
+            <Database className="w-3.5 h-3.5 text-saffron-500" /> {t('nav_vector_match')}
           </Link>
           <Link href="/eligibility" className="hover:text-saffron-500 transition-colors">
             {t('nav_eligibility')}
           </Link>
           <Link href="/automation" className="hover:text-saffron-500 transition-colors flex items-center gap-1">
-            <Cpu className="w-3.5 h-3.5 text-emerald-400" /> n8n OCR
+            <Cpu className="w-3.5 h-3.5 text-emerald-400" /> {t('nav_n8n_ocr')}
           </Link>
           <Link href="/tracking" className="hover:text-saffron-500 transition-colors">
             {t('nav_tracking')}
@@ -76,20 +76,26 @@ export default function Navbar() {
               <Link href="/profile"
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-saffron-500 hover:bg-saffron-600 text-govblue-900 font-extrabold text-xs rounded-xl transition-colors">
                 <UserCircle className="w-4 h-4" />
-                <span className="hidden sm:inline max-w-[80px] truncate">{user.name?.split(' ')[0]}</span>
+                <span className="hidden sm:inline max-w-[80px] truncate">{user.name?.split(' ')[0] || t('nav_profile')}</span>
               </Link>
               <button onClick={logout}
                 className="p-2 bg-white/10 hover:bg-rose-500/30 rounded-xl border border-white/20 text-white transition-colors"
-                title="Logout">
+                title={t('nav_logout')}>
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
           ) : (
-            <Link href="/login"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl transition-colors">
-              <LogIn className="w-4 h-4" />
-              <span className="hidden sm:inline">Login</span>
-            </Link>
+            <div className="flex items-center gap-1.5">
+              <Link href="/login"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl transition-colors">
+                <LogIn className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('nav_login')}</span>
+              </Link>
+              <Link href="/register"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-saffron-500 hover:bg-saffron-600 text-govblue-900 font-extrabold text-xs rounded-xl transition-colors">
+                <span className="hidden sm:inline">{t('nav_register')}</span>
+              </Link>
+            </div>
           )}
         </div>
 

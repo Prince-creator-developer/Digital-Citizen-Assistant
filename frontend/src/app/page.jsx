@@ -86,12 +86,12 @@ export default function Home() {
 
   const categoryPills = [
     { id: 'ALL', label: t('category_all'), icon: Filter },
-    { id: 'Farmers', label: 'किसान (Farmers)', icon: Tractor },
-    { id: 'Elders', label: 'वरिष्ठ नागरिक (Elders)', icon: Users },
-    { id: 'Children', label: 'बच्चे एवं छात्र (Children)', icon: GraduationCap },
-    { id: 'BPL', label: 'BPL राशन (Poverty Alleviation)', icon: ShieldCheck },
-    { id: 'Women', label: 'महिलाएं (Women)', icon: Heart },
-    { id: 'Artisans', label: 'कारीगर (Artisans)', icon: Award },
+    { id: 'Farmers', label: t('category_farmers'), icon: Tractor },
+    { id: 'Elders', label: t('category_elders'), icon: Users },
+    { id: 'Children', label: t('category_children'), icon: GraduationCap },
+    { id: 'BPL', label: t('category_bpl'), icon: ShieldCheck },
+    { id: 'Women', label: t('category_women'), icon: Heart },
+    { id: 'Artisans', label: t('category_artisans'), icon: Award },
   ];
 
   return (
@@ -102,15 +102,15 @@ export default function Home() {
         <div className="max-w-3xl space-y-4 relative z-10">
           <div className="inline-flex items-center space-x-2 px-3 py-1 bg-saffron-500/20 text-saffron-300 text-xs font-bold rounded-full border border-saffron-500/30">
             <Sparkles className="w-4 h-4 text-saffron-400" />
-            <span>Multilingual Voice & Vector AI Engine (Llama 3 + Gemini)</span>
+            <span>{t('hero_badge')}</span>
           </div>
 
           <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight">
-            अपनी भाषा में बोलें और पाएं अपनी सही सरकारी योजना
+            {t('hero_title')}
           </h2>
           
           <p className="text-sm text-slate-300">
-            PostgreSQL Vector Match & AI eligibility engine for Farmers, Elders, Children, BPL, & Artisans.
+            {t('hero_subtitle')}
           </p>
 
           {/* Search Input Bar */}
@@ -131,7 +131,7 @@ export default function Home() {
                 type="submit"
                 className="px-6 py-3.5 bg-saffron-500 hover:bg-saffron-600 text-govblue-900 font-extrabold text-sm rounded-2xl shadow-lg hover:shadow-xl transition-all"
               >
-                खोजें
+                {t('search_btn')}
               </button>
               <button
                 type="button"
@@ -146,21 +146,21 @@ export default function Home() {
 
           {/* Quick Filter Chips */}
           <div className="flex flex-wrap gap-2 pt-2">
-            <span className="text-[11px] font-bold text-slate-400">त्वरित खोज (Quick Chips):</span>
+            <span className="text-[11px] font-bold text-slate-400">{t('quick_search_label')}</span>
             {[
-              "Show all eligible schemes for me",
-              "Farmer crop & income subsidy",
-              "Old age pension for senior citizens",
-              "BPL free ration food grains",
-              "Sukanya girl child savings"
+              { label: t('quick_chip_1'), query: "Show all eligible schemes for me" },
+              { label: t('quick_chip_2'), query: "Farmer crop & income subsidy" },
+              { label: t('quick_chip_3'), query: "Old age pension for senior citizens" },
+              { label: t('quick_chip_4'), query: "BPL free ration food grains" },
+              { label: t('quick_chip_5'), query: "Sukanya girl child savings" }
             ].map((chip, idx) => (
               <button
                 key={idx}
                 type="button"
-                onClick={() => { setSearchQuery(chip); fetchSchemes(chip); }}
+                onClick={() => { setSearchQuery(chip.label); fetchSchemes(chip.query); }}
                 className="px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-semibold text-slate-200 transition-colors"
               >
-                {chip}
+                {chip.label}
               </button>
             ))}
           </div>
@@ -201,7 +201,7 @@ export default function Home() {
             <span className="text-saffron-400">Filter: {searchMeta.filterApplied}</span>
           </div>
 
-          <span className="text-slate-400">Unified API Engine Active</span>
+          <span className="text-slate-400">{t('api_engine_active')}</span>
         </div>
       )}
 
@@ -209,10 +209,10 @@ export default function Home() {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-extrabold text-govblue-900 flex items-center gap-2">
-            लक्षित योजनाएं (Targeted Schemes) ({schemes.length})
+            {t('targeted_schemes')} ({schemes.length})
           </h3>
           <span className="text-xs font-semibold text-slate-500">
-            Real-time Vector Search Active
+            {t('vector_active')}
           </span>
         </div>
 

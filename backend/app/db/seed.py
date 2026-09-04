@@ -6,6 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from app.db.database import SessionLocal, engine, Base
 from app.models.models import Scheme, CitizenProfile, Application
+from app.models.user_model import User, UserDocument
 from app.services.vector_service import generate_text_embedding
 
 def seed_database():
@@ -478,17 +479,230 @@ def seed_database():
         db.commit()
         print(f"[OK] {len(schemes_to_add)} schemes seeded successfully!")
 
-        print("Seeding Demo Citizen Profiles...")
+        print("[OK] Schemes seeded successfully!")
+
+        print("Seeding Privacy-Protected User Accounts into PostgreSQL...")
+        import hashlib
+        import bcrypt
+
+        def make_pw_hash(pw: str) -> str:
+            pw_bytes = pw.encode('utf-8')[:72]
+            return bcrypt.hashpw(pw_bytes, bcrypt.gensalt()).decode('utf-8')
+
+        def make_sha256(text: str) -> str:
+            return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+        # Seed Users with privacy hashes & bcrypt passwords
+        demo_users = [
+            User(
+                name="Prince Kumar",
+                name_anonymized="P***** K****",
+                email="prince@example.com",
+                phone="9876543210",
+                phone_hash=make_sha256("9876543210"),
+                hashed_password=make_pw_hash("demo123"),
+                age=21,
+                gender="Male",
+                state="Bihar",
+                district="Patna",
+                annual_income=140000.0,
+                occupation="Student / Freelancer",
+                category="OBC",
+                language_preference="hi",
+                is_farmer=False,
+                has_ration_card=True,
+                ration_card_type="PHH",
+                aadhaar_last4="1100",
+                aadhaar_hash=make_sha256("554433221100"),
+                profile_complete=True
+            ),
+            User(
+                name="Ramesh Kumar",
+                name_anonymized="R***** K****",
+                email="ramesh@example.com",
+                phone="9876543211",
+                phone_hash=make_sha256("9876543211"),
+                hashed_password=make_pw_hash("demo123"),
+                age=45,
+                gender="Male",
+                state="Uttar Pradesh",
+                district="Varanasi",
+                annual_income=120000.0,
+                occupation="Farmer",
+                category="OBC",
+                language_preference="hi",
+                is_farmer=True,
+                land_area_acres=3.5,
+                has_ration_card=True,
+                ration_card_type="AAY",
+                aadhaar_last4="4402",
+                aadhaar_hash=make_sha256("998877664402"),
+                profile_complete=True
+            ),
+            User(
+                name="Ananya Gowda",
+                name_anonymized="A***** G****",
+                email="ananya.gowda@example.com",
+                phone="9876543212",
+                phone_hash=make_sha256("9876543212"),
+                hashed_password=make_pw_hash("demo123"),
+                age=24,
+                gender="Female",
+                state="Karnataka",
+                district="Bengaluru Rural",
+                annual_income=180000.0,
+                occupation="Silk Weaver & Artisan",
+                category="General",
+                language_preference="kn",
+                is_farmer=False,
+                has_ration_card=True,
+                ration_card_type="PHH",
+                aadhaar_last4="7890",
+                aadhaar_hash=make_sha256("123456787890"),
+                profile_complete=True
+            ),
+            User(
+                name="Priya Sharma",
+                name_anonymized="P**** S*****",
+                email="priya.sharma@example.com",
+                phone="9876543213",
+                phone_hash=make_sha256("9876543213"),
+                hashed_password=make_pw_hash("demo123"),
+                age=29,
+                gender="Female",
+                state="Maharashtra",
+                district="Pune",
+                annual_income=95000.0,
+                occupation="Self-Employed (SHG Member)",
+                category="General",
+                language_preference="mr",
+                is_farmer=False,
+                has_ration_card=True,
+                ration_card_type="PHH",
+                aadhaar_last4="3321",
+                aadhaar_hash=make_sha256("445566773321"),
+                profile_complete=True
+            ),
+            User(
+                name="Suresh Nair",
+                name_anonymized="S***** N***",
+                email="suresh.nair@example.com",
+                phone="9876543214",
+                phone_hash=make_sha256("9876543214"),
+                hashed_password=make_pw_hash("demo123"),
+                age=68,
+                gender="Male",
+                state="Kerala",
+                district="Kottayam",
+                annual_income=75000.0,
+                occupation="Senior Citizen / Retired",
+                category="BPL",
+                language_preference="ml",
+                is_farmer=False,
+                has_ration_card=True,
+                ration_card_type="AAY",
+                aadhaar_last4="9012",
+                aadhaar_hash=make_sha256("778899009012"),
+                profile_complete=True
+            )
+        ]
+
+        db.query(UserDocument).delete()
+        db.query(User).delete()
+        db.commit()
+
+        db.add_all(demo_users)
+        db.commit()
+        for u in demo_users:
+            db.refresh(u)
+        print(f"[OK] {len(demo_users)} User accounts seeded into PostgreSQL with bcrypt password hashes!")
+
+        # Seed Verified User Documents in OCR Vault
+        docs = [
+            UserDocument(
+                user_id=demo_users[0].id,
+                tracking_code="DOC-CASTE-BC-PATNA-9466372",
+                document_type="caste_certificate",
+                filename="bihar_caste_cert_form_iv.jpg",
+                file_format="Image",
+                extracted_fields={
+                    "name": "प्रिंस कुमार (Prince Kumar)",
+                    "caste_community": "यादव ( ग्वाला )",
+                    "reservation_category": "OBC / BC (पिछड़ा वर्ग - अनुसूची 2)",
+                    "certificate_number": "BCCCO/2023/9466372",
+                    "issuing_authority": "राजस्व अधिकारी / अंचल संपतचक, पटना"
+                },
+                raw_text="बिहार सरकार... पिछड़ा वर्ग अनुसूची-2... प्रमाण पत्र संख्या BCCCO/2023/9466372",
+                confidence_score=99.2,
+                status="OCR_VERIFIED"
+            ),
+            UserDocument(
+                user_id=demo_users[0].id,
+                tracking_code="DOC-AADHAAR-PRINCE-1100",
+                document_type="aadhaar",
+                filename="aadhaar_front_back.png",
+                file_format="Image",
+                extracted_fields={
+                    "name": "Prince Kumar",
+                    "date_of_birth": "12/05/2004",
+                    "gender": "Male",
+                    "address": "Sampatchak, Patna, Bihar - 800020",
+                    "id_masked": "XXXX-XXXX-1100"
+                },
+                raw_text="GOVERNMENT OF INDIA... 5544 3322 1100... Mera Aadhaar Meri Pehchan",
+                confidence_score=98.8,
+                status="OCR_VERIFIED"
+            ),
+            UserDocument(
+                user_id=demo_users[1].id,
+                tracking_code="DOC-LAND-RAMESH-4402",
+                document_type="land_record",
+                filename="khasra_khatoni_up.pdf",
+                file_format="PDF",
+                extracted_fields={
+                    "owner_name": "Ramesh Kumar",
+                    "khasra_number": "402/12",
+                    "land_area": "3.5 Acres",
+                    "village": "Shivpur",
+                    "district": "Varanasi"
+                },
+                raw_text="उत्तर प्रदेश भू-अभिलेख... खसरा संख्या 402/12...",
+                confidence_score=97.5,
+                status="OCR_VERIFIED"
+            ),
+            UserDocument(
+                user_id=demo_users[2].id,
+                tracking_code="DOC-AADHAAR-ANANYA-7890",
+                document_type="aadhaar",
+                filename="aadhaar_ananya_karnataka.png",
+                file_format="Image",
+                extracted_fields={
+                    "name": "Ananya Gowda",
+                    "date_of_birth": "15/08/2000",
+                    "gender": "Female",
+                    "address": "Doddaballapur, Bengaluru Rural, Karnataka - 561203",
+                    "id_masked": "XXXX-XXXX-7890"
+                },
+                raw_text="GOVERNMENT OF INDIA... ಭಾರತ ಸರ್ಕಾರ... Ananya Gowda...",
+                confidence_score=99.0,
+                status="OCR_VERIFIED"
+            )
+        ]
+        db.add_all(docs)
+        db.commit()
+        print(f"[OK] {len(docs)} User documents saved to Citizen Vault!")
+
+        # Seed Citizen Profiles
         citizens = [
-            CitizenProfile(phone_number="9876543210", name="Ramesh Kumar", age=42, gender="Male",
-                           state="Uttar Pradesh", annual_income=140000, occupation="Farmer",
-                           category="BPL", language_preference="hi"),
-            CitizenProfile(phone_number="9876543211", name="Priya Sharma", age=28, gender="Female",
-                           state="Maharashtra", annual_income=120000, occupation="Self-Employed",
-                           category="BPL", language_preference="mr"),
-            CitizenProfile(phone_number="9876543212", name="Suresh Nair", age=65, gender="Male",
-                           state="Kerala", annual_income=80000, occupation="Retired",
-                           category="BPL", language_preference="ml"),
+            CitizenProfile(phone_number="9876543210", name="Prince Kumar", age=21, gender="Male",
+                           state="Bihar", annual_income=140000, occupation="Student",
+                           category="OBC", language_preference="hi"),
+            CitizenProfile(phone_number="9876543211", name="Ramesh Kumar", age=45, gender="Male",
+                           state="Uttar Pradesh", annual_income=120000, occupation="Farmer",
+                           category="OBC", language_preference="hi"),
+            CitizenProfile(phone_number="9876543212", name="Ananya Gowda", age=24, gender="Female",
+                           state="Karnataka", annual_income=180000, occupation="Artisan",
+                           category="General", language_preference="kn"),
         ]
         db.add_all(citizens)
         db.commit()
@@ -497,20 +711,20 @@ def seed_database():
 
         app1 = Application(
             tracking_code="GOV-SIH-998822A",
-            citizen_id=citizens[0].id,
+            citizen_id=citizens[1].id,
             scheme_id=schemes_to_add[0].id,
             status="DBT Processed",
             documents_url="https://storage.gov.in/docs/ramesh_aadhaar.pdf",
             verification_score=98.5,
             ocr_extracted_data={"name": "Ramesh Kumar", "aadhaar_last4": "4402", "state": "Uttar Pradesh"},
-            remarks="₹2,000 installment credited to SBI A/C ending 4402"
+            remarks="₹2,000 installment credited to SBI A/C ending 4402 via PM-KISAN DBT"
         )
         db.add(app1)
         db.commit()
-        print(f"✅ Database seed complete! {len(schemes_to_add)} schemes, {len(citizens)} citizens seeded.")
+        print(f"[OK] Database seed complete! {len(schemes_to_add)} schemes, {len(demo_users)} users, {len(docs)} documents seeded.")
 
     except Exception as e:
-        print(f"❌ Error seeding database: {e}")
+        print(f"[ERROR] Error seeding database: {e}")
         import traceback
         traceback.print_exc()
         db.rollback()
@@ -519,3 +733,4 @@ def seed_database():
 
 if __name__ == "__main__":
     seed_database()
+

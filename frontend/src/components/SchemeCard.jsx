@@ -82,7 +82,7 @@ export default function SchemeCard({ scheme }) {
         {/* Key Benefits */}
         <div className="mt-4 bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-1">
           <div className="text-[11px] font-extrabold uppercase text-slate-400 flex items-center gap-1">
-            <Gift className="w-3.5 h-3.5 text-saffron-500" /> Key Benefit (मुख्य लाभ)
+            <Gift className="w-3.5 h-3.5 text-saffron-500" /> {t('key_benefits')}
           </div>
           <p className="text-xs font-bold text-slate-800">
             {scheme.benefits}
@@ -97,7 +97,7 @@ export default function SchemeCard({ scheme }) {
           className="text-xs font-bold text-govblue-900 hover:text-saffron-600 flex items-center gap-1 transition-colors"
           title="Voice-guided step-by-step registration help"
         >
-          <Sparkles className="w-3.5 h-3.5 text-saffron-500" /> आवेदन गाइड 🎙️
+          <Sparkles className="w-3.5 h-3.5 text-saffron-500" /> {t('apply_guide')}
         </button>
 
         {applicationSuccess ? (

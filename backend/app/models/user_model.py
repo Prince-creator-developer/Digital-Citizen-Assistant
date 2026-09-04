@@ -13,8 +13,10 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
+    name_anonymized = Column(String(100), nullable=True)
     email = Column(String(150), unique=True, index=True, nullable=False)
     phone = Column(String(15), unique=True, index=True, nullable=False)
+    phone_hash = Column(String(64), nullable=True, index=True)  # SHA-256 privacy hash
     hashed_password = Column(String(200), nullable=False)
 
     # Citizen profile fields
@@ -31,9 +33,10 @@ class User(Base):
     has_ration_card = Column(Boolean, default=False)
     ration_card_type = Column(String(20), nullable=True)  # AAY, PHH, NPHH
 
-    # Meta
+    # Meta & Privacy
     is_active = Column(Boolean, default=True)
     aadhaar_last4 = Column(String(4), nullable=True)
+    aadhaar_hash = Column(String(64), nullable=True)  # SHA-256 privacy hash
     profile_complete = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import apiService from '../../services/api';
 import SchemeGuidanceBot from '../../components/SchemeGuidanceBot';
+import { useTranslation } from 'react-i18next';
 
 const DOC_TYPE_META = {
   aadhaar: { label: 'Aadhaar Card', labelHi: 'आधार कार्ड', color: 'from-blue-600 to-indigo-600', icon: CreditCard },
@@ -20,6 +21,7 @@ const DOC_TYPE_META = {
 };
 
 export default function ProfilePage() {
+  const { t } = useTranslation();
   const { user, token, logout, getProfile, updateProfile } = useAuth();
   const router = useRouter();
 
@@ -203,12 +205,34 @@ export default function ProfilePage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-3">
         <Loader2 className="w-10 h-10 animate-spin text-saffron-500" />
-        <p className="text-sm font-extrabold text-govblue-900">नागरिक पोर्टल लोड हो रहा है…</p>
+        <p className="text-sm font-extrabold text-govblue-900">नागरिक प्रोफाइल लोड हो रहा है…</p>
       </div>
     );
   }
 
-  if (!profile) return null;
+  if (!token || !profile) {
+    return (
+      <div className="max-w-xl mx-auto my-12 bg-white rounded-3xl p-8 border-2 border-saffron-500 shadow-2xl text-center space-y-5">
+        <div className="w-16 h-16 bg-saffron-100 rounded-2xl flex items-center justify-center mx-auto text-saffron-600 font-black text-2xl">
+          👤
+        </div>
+        <div className="space-y-1">
+          <h2 className="text-xl font-black text-govblue-900">नागरिक लॉगिन आवश्यक है (Login Required)</h2>
+          <p className="text-xs text-slate-500">
+            Please log in or register to view your profile, document vault, and personalized scheme recommendations.
+          </p>
+        </div>
+        <div className="flex gap-3 justify-center">
+          <Link href="/login" className="px-6 py-3 bg-govblue-900 hover:bg-govblue-800 text-white font-extrabold text-xs rounded-xl shadow-lg">
+            Login Now
+          </Link>
+          <Link href="/register" className="px-6 py-3 bg-saffron-500 hover:bg-saffron-600 text-govblue-900 font-extrabold text-xs rounded-xl shadow-lg">
+            Register Account
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
@@ -287,10 +311,10 @@ export default function ProfilePage() {
       {/* Navigation Tabs */}
       <div className="flex items-center space-x-2 border-b border-slate-200 pb-2 overflow-x-auto scrollbar-none">
         {[
-          { id: 'vault', label: '📁 OCR Document Vault', count: documents.length, badge: 'Vault' },
-          { id: 'schemes', label: '🎯 Eligible Schemes', count: eligibleSchemes.length, badge: 'Live AI' },
-          { id: 'upload', label: '📤 Upload Document', badge: 'OCR' },
-          { id: 'profile', label: '👤 Profile Details', badge: 'Info' },
+          { id: 'vault', label: t('vault_tab_title') || '📁 OCR Document Vault', count: documents.length, badge: 'Vault' },
+          { id: 'schemes', label: t('eligible_tab_title') || '🎯 Eligible Schemes', count: eligibleSchemes.length, badge: 'Live AI' },
+          { id: 'upload', label: t('upload_tab_title') || '📤 Upload Document', badge: 'OCR' },
+          { id: 'profile', label: t('profile_tab_title') || '👤 Profile Details', badge: 'Info' },
         ].map((tab) => (
           <button
             key={tab.id}

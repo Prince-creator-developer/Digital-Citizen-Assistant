@@ -154,11 +154,21 @@ def register(data: UserRegisterRequest, db: Session = Depends(get_db)):
         )
 
     hashed_pw = hash_password(data.password)
+    
+    import hashlib
+    phone_sha256 = hashlib.sha256(clean_phone.encode('utf-8')).hexdigest()
+    aadhaar_sha256 = hashlib.sha256(data.aadhaar_last4.encode('utf-8')).hexdigest() if data.aadhaar_last4 else None
+    
+    # Anonymized name (e.g. Ramesh Kumar -> R*** K***)
+    name_parts = data.name.strip().split()
+    masked_name = " ".join([p[0] + "*" * (len(p) - 1) if len(p) > 1 else p for p in name_parts])
 
     user = User(
         name=data.name.strip(),
+        name_anonymized=masked_name,
         email=clean_email,
         phone=clean_phone,
+        phone_hash=phone_sha256,
         hashed_password=hashed_pw,
         age=data.age,
         gender=data.gender or "Other",
@@ -173,6 +183,7 @@ def register(data: UserRegisterRequest, db: Session = Depends(get_db)):
         has_ration_card=bool(data.has_ration_card),
         ration_card_type=data.ration_card_type,
         aadhaar_last4=data.aadhaar_last4,
+        aadhaar_hash=aadhaar_sha256,
         profile_complete=bool(data.age and data.state and (data.annual_income is not None))
     )
 
@@ -248,8 +259,11 @@ def get_profile(current_user: User = Depends(require_auth), db: Session = Depend
     return {
         "id": current_user.id,
         "name": current_user.name,
+        "name_anonymized": current_user.name_anonymized or current_user.name,
         "email": current_user.email,
         "phone": current_user.phone,
+        "phone_hash": current_user.phone_hash,
+        "aadhaar_hash": current_user.aadhaar_hash,
         "age": current_user.age,
         "gender": current_user.gender,
         "state": current_user.state,

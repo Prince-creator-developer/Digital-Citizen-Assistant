@@ -16,7 +16,22 @@ const resources = {
   ta: { translation: ta },
   te: { translation: te },
   mr: { translation: mr },
-  bn: { translation: bn }
+  bn: { translation: bn },
+  ur: { translation: hi },
+  gu: { translation: hi },
+  or: { translation: hi },
+  ml: { translation: hi },
+  pa: { translation: hi },
+  as: { translation: hi },
+  mai: { translation: hi },
+  sa: { translation: hi },
+  ks: { translation: hi },
+  ne: { translation: hi },
+  sd: { translation: hi },
+  kok: { translation: hi },
+  doi: { translation: hi },
+  mni: { translation: hi },
+  brx: { translation: hi }
 };
 
 if (!i18n.isInitialized) {
