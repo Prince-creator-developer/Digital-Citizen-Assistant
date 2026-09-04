@@ -4,7 +4,7 @@ import {
   X, Volume2, VolumeX, ChevronRight, ChevronLeft, ExternalLink,
   Sparkles, CheckCircle2, Play, Pause, Loader2, Copy, Check,
   Bot, HelpCircle, Minimize2, Maximize2, FileText, User, CreditCard,
-  Building2, ShieldCheck, Zap, ArrowRight
+  Building2, ShieldCheck, Zap, ArrowRight, Mic, Radio, Move
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -29,9 +29,9 @@ const BOT_LANGUAGES = [
   { code: 'ks-IN', label: 'کٲشُر (Kashmiri)', short: 'ks' },
   { code: 'ne-IN', label: 'नेपाली (Nepali)', short: 'ne' },
   { code: 'sd-IN', label: 'سنڌي (Sindhi)', short: 'sd' },
-  { code: 'kok-IN', label: 'कोंकणी (Konkani)', short: 'kok' },
+  { code: 'kok-IN', label: 'कोंಕಣಿ (Konkani)', short: 'kok' },
   { code: 'doi-IN', label: 'डोगरी (Dogri)', short: 'doi' },
-  { code: 'mni-IN', label: 'মৈতৈಲೋন্ (Manipuri)', short: 'mni' },
+  { code: 'mni-IN', label: 'মৈতৈলোন্ (Manipuri)', short: 'mni' },
   { code: 'brx-IN', label: 'बड़ो (Bodo)', short: 'brx' },
 ];
 
@@ -81,7 +81,7 @@ export default function SchemeGuidanceBot({ scheme, onClose }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [autoPlay, setAutoPlay] = useState(true);
-  const [minimized, setMinimized] = useState(false);
+  const [mode, setMode] = useState('modal'); // 'modal' | 'floating_overlay' | 'minimized'
   const [language, setLanguage] = useState(i18n?.language === 'kn' ? 'kn-IN' : (i18n?.language === 'en' ? 'en-IN' : 'hi-IN'));
   const [copiedField, setCopiedField] = useState(null);
   const [activeTab, setActiveTab] = useState('guide'); // 'guide' | 'simulator'
@@ -168,20 +168,26 @@ export default function SchemeGuidanceBot({ scheme, onClose }) {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const openGovPortal = () => {
+  const launchIndependentOverlayAndOpenPortal = () => {
     stopSpeech();
+    // 1. Open official government portal in clean new tab
     if (scheme?.application_link) {
       window.open(scheme.application_link, '_blank', 'noopener,noreferrer');
     }
+    // 2. Transition bot to floating independent overlay co-pilot
+    setMode('floating_overlay');
+    setTimeout(() => {
+      speakStep(0);
+    }, 600);
   };
 
   const autofillSimFromVault = () => {
     setSimForm({
-      fullName: user?.name || 'Ramesh Kumar',
+      fullName: user?.name || 'Prince Kumar',
       mobile: user?.phone || '9876543210',
       aadhaar: user?.aadhaar_last4 ? `XXXX-XXXX-${user.aadhaar_last4}` : '5544-3322-1100',
-      state: user?.state || 'Uttar Pradesh',
-      district: user?.district || 'Varanasi',
+      state: user?.state || 'Bihar',
+      district: user?.district || 'Patna',
       bankAcc: '91880011223344',
       ifsc: 'SBIN0001234'
     });
@@ -192,11 +198,11 @@ export default function SchemeGuidanceBot({ scheme, onClose }) {
   const currentStepData = steps[currentStep] || steps[0];
   const progressPercent = steps.length > 0 ? ((currentStep + 1) / steps.length) * 100 : 0;
 
-  // Minimized Floating Widget
-  if (minimized) {
+  // ─── VIEW 1: MINIMIZED FLOATING ICON ─────────────────────────────────────────
+  if (mode === 'minimized') {
     return (
-      <div className="fixed bottom-6 right-6 z-50 bg-govblue-900 text-white rounded-3xl p-4 shadow-2xl border-4 border-saffron-500 max-w-xs animate-bounce-subtle flex items-center gap-3">
-        <div className="w-10 h-10 rounded-2xl bg-saffron-500 text-govblue-900 flex items-center justify-center font-black">
+      <div className="fixed bottom-6 right-6 z-50 bg-govblue-900 text-white rounded-3xl p-3.5 shadow-2xl border-4 border-saffron-500 max-w-xs animate-bounce-subtle flex items-center gap-3">
+        <div className="w-10 h-10 rounded-2xl bg-saffron-500 text-govblue-900 flex items-center justify-center font-black shadow-md">
           <Bot className="w-6 h-6" />
         </div>
         <div className="flex-1 min-w-0">
@@ -204,16 +210,16 @@ export default function SchemeGuidanceBot({ scheme, onClose }) {
           <p className="text-[10px] text-saffron-400 font-bold">Step {currentStep + 1} of {steps.length}</p>
         </div>
         <button
-          onClick={() => setMinimized(false)}
-          className="p-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-colors"
-          title="Expand"
+          onClick={() => setMode('floating_overlay')}
+          className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-colors"
+          title="Expand Co-Pilot"
         >
           <Maximize2 className="w-4 h-4" />
         </button>
         <button
           onClick={() => { stopSpeech(); onClose(); }}
-          className="p-1.5 bg-rose-500/30 hover:bg-rose-500 rounded-xl text-white transition-colors"
-          title="Close"
+          className="p-2 bg-rose-500/30 hover:bg-rose-500 rounded-xl text-white transition-colors"
+          title="Close Guide"
         >
           <X className="w-4 h-4" />
         </button>
@@ -221,6 +227,143 @@ export default function SchemeGuidanceBot({ scheme, onClose }) {
     );
   }
 
+  // ─── VIEW 2: INDEPENDENT FLOATING OVERLAY CO-PILOT ────────────────────────────
+  if (mode === 'floating_overlay') {
+    return (
+      <aside aria-label="GOI Overlay Co-Pilot" className="fixed bottom-6 right-6 z-50 w-96 max-w-[95vw] bg-gradient-to-br from-govblue-900 via-slate-900 to-govblue-950 text-white rounded-3xl p-5 shadow-2xl border-4 border-saffron-500 space-y-4 animate-fade-in backdrop-blur-xl">
+        
+        {/* Top Header & Indicator */}
+        <div className="flex items-center justify-between pb-3 border-b border-white/10">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 bg-gradient-to-tr from-saffron-500 to-amber-500 text-govblue-900 rounded-2xl flex items-center justify-center font-black shadow-lg">
+              <Bot className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <h4 className="text-xs font-black text-white">GOI Overlay Co-Pilot</h4>
+              </div>
+              <p className="text-[10px] text-saffron-300 font-bold">Independent Guide (0 Permissions)</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setMode('modal')}
+              className="p-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-slate-300 hover:text-white"
+              title="Full Modal View"
+            >
+              <FileText className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setMode('minimized')}
+              className="p-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-slate-300 hover:text-white"
+              title="Minimize"
+            >
+              <Minimize2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => { stopSpeech(); onClose(); }}
+              className="p-1.5 bg-rose-500/20 hover:bg-rose-500 rounded-xl text-rose-300 hover:text-white"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Current Active Step Box with Voice Synthesizer */}
+        <div className="space-y-2 bg-white/10 p-4 rounded-2xl border border-white/10">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black text-saffron-400 uppercase tracking-wider flex items-center gap-1">
+              <Radio className="w-3 h-3 text-emerald-400 animate-pulse" /> Step {currentStep + 1} of {steps.length}
+            </span>
+
+            <button
+              onClick={isSpeaking ? stopSpeech : () => speakStep(currentStep)}
+              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 ${
+                isSpeaking
+                  ? 'bg-rose-500 text-white animate-pulse'
+                  : 'bg-saffron-500 text-govblue-900 hover:bg-saffron-400 shadow'
+              }`}
+            >
+              {isSpeaking ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+              <span>{isSpeaking ? 'Pause' : 'Voice'}</span>
+            </button>
+          </div>
+
+          <p className="text-xs font-black text-white leading-relaxed">
+            {language.startsWith('kn')
+              ? (currentStepData.textKn || currentStepData.text)
+              : (language.startsWith('hi') ? currentStepData.text : currentStepData.textEn)}
+          </p>
+        </div>
+
+        {/* 1-Click Clipboard Drawer for Form Auto-Fill */}
+        <div className="space-y-1.5 text-[10px] bg-slate-950/60 p-3 rounded-2xl border border-white/10">
+          <span className="text-slate-400 font-bold block flex items-center gap-1">
+            <Copy className="w-3 h-3 text-saffron-400" /> 1-Click Copy into Live Govt Portal:
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => copyToClipboard(user?.name || 'Prince Kumar', 'name')}
+              className="px-2 py-1 bg-white/10 hover:bg-saffron-500 hover:text-govblue-900 rounded-lg text-white font-mono flex items-center gap-1 border border-white/10 transition-colors"
+            >
+              <span>Name: {user?.name || 'Prince Kumar'}</span>
+              {copiedField === 'name' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
+            </button>
+            <button
+              onClick={() => copyToClipboard(user?.phone || '9876543210', 'phone')}
+              className="px-2 py-1 bg-white/10 hover:bg-saffron-500 hover:text-govblue-900 rounded-lg text-white font-mono flex items-center gap-1 border border-white/10 transition-colors"
+            >
+              <span>Mobile: {user?.phone || '9876543210'}</span>
+              {copiedField === 'phone' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
+            </button>
+            <button
+              onClick={() => copyToClipboard(user?.aadhaar_last4 ? `XXXX-XXXX-${user.aadhaar_last4}` : '5544-3322-1100', 'aadhaar')}
+              className="px-2 py-1 bg-white/10 hover:bg-saffron-500 hover:text-govblue-900 rounded-lg text-white font-mono flex items-center gap-1 border border-white/10 transition-colors"
+            >
+              <span>Aadhaar: {user?.aadhaar_last4 ? `XXXX-${user.aadhaar_last4}` : '1100'}</span>
+              {copiedField === 'aadhaar' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Step Controls */}
+        <div className="flex items-center justify-between pt-1">
+          <button
+            onClick={() => handleStepChange(currentStep - 1)}
+            disabled={currentStep === 0}
+            className="px-3 py-1.5 bg-white/10 hover:bg-white/20 disabled:opacity-30 text-xs font-bold rounded-xl"
+          >
+            Prev
+          </button>
+          
+          <div className="flex gap-1">
+            {steps.map((_, i) => (
+              <span
+                key={i}
+                className={`transition-all rounded-full ${
+                  i === currentStep ? 'w-4 h-2 bg-saffron-500' : 'w-2 h-2 bg-white/20'
+                }`}
+              />
+            ))}
+          </div>
+
+          <button
+            onClick={() => handleStepChange(currentStep + 1)}
+            disabled={currentStep === steps.length - 1}
+            className="px-3 py-1.5 bg-saffron-500 hover:bg-saffron-400 text-govblue-900 disabled:opacity-30 text-xs font-black rounded-xl"
+          >
+            Next
+          </button>
+        </div>
+
+      </aside>
+    );
+  }
+
+  // ─── VIEW 3: FULL SCREEN / MODAL GUIDE & FORM SIMULATOR ──────────────────────
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
       <div className="relative bg-white rounded-3xl max-w-2xl w-full shadow-2xl border-4 border-saffron-500 overflow-hidden my-6">
@@ -235,7 +378,7 @@ export default function SchemeGuidanceBot({ scheme, onClose }) {
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-black tracking-tight">{tI18n('guidance_bot_title')}</h3>
                 <span className="px-2 py-0.5 bg-emerald-500 text-white font-black text-[9px] rounded-full uppercase">
-                  Voice Guide Active
+                  DECODE SIH 2026
                 </span>
               </div>
               <p className="text-xs text-saffron-300 font-bold truncate max-w-sm">{scheme.title}</p>
@@ -244,7 +387,7 @@ export default function SchemeGuidanceBot({ scheme, onClose }) {
 
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => setMinimized(true)}
+              onClick={() => setMode('minimized')}
               className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
               title="Minimize to Floating Bot"
             >
@@ -365,10 +508,10 @@ export default function SchemeGuidanceBot({ scheme, onClose }) {
               </span>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => copyToClipboard(user?.name || 'Ramesh Kumar', 'name')}
+                  onClick={() => copyToClipboard(user?.name || 'Prince Kumar', 'name')}
                   className="px-3 py-1.5 bg-white border border-slate-200 hover:border-saffron-500 rounded-xl text-xs font-bold text-slate-700 flex items-center gap-1.5 shadow-sm"
                 >
-                  <span>Name: {user?.name || 'Ramesh Kumar'}</span>
+                  <span>Name: {user?.name || 'Prince Kumar'}</span>
                   {copiedField === 'name' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
                 </button>
                 <button
@@ -525,7 +668,7 @@ export default function SchemeGuidanceBot({ scheme, onClose }) {
         )}
 
         {/* Modal Footer Controls */}
-        <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between gap-3">
+        <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
           {activeTab === 'guide' ? (
             <>
               <button
@@ -537,12 +680,12 @@ export default function SchemeGuidanceBot({ scheme, onClose }) {
               </button>
 
               <button
-                onClick={openGovPortal}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 hover:scale-105 transition-all"
-                title="Opens real official portal in new tab"
+                onClick={launchIndependentOverlayAndOpenPortal}
+                className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-600/30 hover:scale-105 transition-all"
+                title="Opens live official portal in new tab & launches floating overlay co-pilot"
               >
                 <ExternalLink className="w-4 h-4" />
-                <span>{tI18n('open_portal_btn')}</span>
+                <span>Launch Overlay & Open GOI Portal</span>
               </button>
 
               {currentStep < steps.length - 1 ? (
@@ -555,7 +698,7 @@ export default function SchemeGuidanceBot({ scheme, onClose }) {
                 </button>
               ) : (
                 <button
-                  onClick={openGovPortal}
+                  onClick={launchIndependentOverlayAndOpenPortal}
                   className="px-4 py-2.5 bg-saffron-500 hover:bg-saffron-600 text-govblue-900 font-black text-xs rounded-xl flex items-center gap-1 shadow-md"
                 >
                   <CheckCircle2 className="w-4 h-4" /> {tI18n('step_complete')}
@@ -565,7 +708,7 @@ export default function SchemeGuidanceBot({ scheme, onClose }) {
           ) : (
             <div className="w-full flex justify-end">
               <button
-                onClick={openGovPortal}
+                onClick={launchIndependentOverlayAndOpenPortal}
                 className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl flex items-center gap-1.5 shadow-lg"
               >
                 <ExternalLink className="w-4 h-4" />

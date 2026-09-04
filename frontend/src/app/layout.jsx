@@ -5,7 +5,7 @@ import ClientLayoutWrapper from '../components/ClientLayoutWrapper';
 import './globals.css';
 
 export const metadata = {
-  title: 'Digital Citizen Assistant — SIH 2026',
+  title: 'Digital Citizen Assistant — DSIH 2026',
   description: 'Multilingual Voice & AI Scheme Access Engine',
 };
 
