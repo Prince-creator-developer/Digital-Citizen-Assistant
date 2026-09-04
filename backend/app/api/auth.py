@@ -191,6 +191,37 @@ def register(data: UserRegisterRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
+    # ─── Synchronize into citizen_profiles table in PostgreSQL ───────────────
+    try:
+        from app.models.models import CitizenProfile
+        citizen_prof = db.query(CitizenProfile).filter(CitizenProfile.phone_number == clean_phone).first()
+        if not citizen_prof:
+            citizen_prof = CitizenProfile(
+                phone_number=clean_phone,
+                name=data.name.strip(),
+                age=data.age or 21,
+                gender=data.gender or "Male",
+                state=data.state or "Bihar",
+                annual_income=data.annual_income if data.annual_income is not None else 140000.0,
+                occupation=data.occupation or "Citizen",
+                category=data.category or "General",
+                language_preference=data.language_preference or "hi"
+            )
+            db.add(citizen_prof)
+            db.commit()
+        else:
+            citizen_prof.name = data.name.strip()
+            if data.age: citizen_prof.age = data.age
+            if data.gender: citizen_prof.gender = data.gender
+            if data.state: citizen_prof.state = data.state
+            if data.annual_income is not None: citizen_prof.annual_income = data.annual_income
+            if data.occupation: citizen_prof.occupation = data.occupation
+            if data.category: citizen_prof.category = data.category
+            if data.language_preference: citizen_prof.language_preference = data.language_preference
+            db.commit()
+    except Exception as e:
+        print(f"[WARN] Error syncing CitizenProfile: {e}")
+
     token = create_access_token({"sub": str(user.id), "email": user.email})
     return TokenResponse(
         access_token=token,
@@ -296,10 +327,26 @@ def update_profile(
     current_user.profile_complete = bool(
         current_user.age and current_user.state and (current_user.annual_income is not None)
     )
-    current_user.updated_at = datetime.datetime.utcnow()
-
     db.commit()
     db.refresh(current_user)
+
+    # Sync into CitizenProfile
+    try:
+        from app.models.models import CitizenProfile
+        citizen_prof = db.query(CitizenProfile).filter(CitizenProfile.phone_number == current_user.phone).first()
+        if citizen_prof:
+            citizen_prof.name = current_user.name
+            if current_user.age: citizen_prof.age = current_user.age
+            if current_user.gender: citizen_prof.gender = current_user.gender
+            if current_user.state: citizen_prof.state = current_user.state
+            if current_user.annual_income is not None: citizen_prof.annual_income = current_user.annual_income
+            if current_user.occupation: citizen_prof.occupation = current_user.occupation
+            if current_user.category: citizen_prof.category = current_user.category
+            if current_user.language_preference: citizen_prof.language_preference = current_user.language_preference
+            db.commit()
+    except Exception as e:
+        print(f"[WARN] Error updating CitizenProfile: {e}")
+
     return {
         "message": "Profile updated successfully.",
         "profile_complete": current_user.profile_complete

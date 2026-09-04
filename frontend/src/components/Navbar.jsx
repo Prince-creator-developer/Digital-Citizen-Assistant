@@ -33,7 +33,7 @@ export default function Navbar() {
             <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
               {t('app_name')}
               <span className="text-[10px] bg-saffron-500 text-govblue-900 font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
-                DECODE SIH
+              DSIH
               </span>
             </h1>
             <p className="text-xs text-slate-300 font-medium hidden sm:block">
