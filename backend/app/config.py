@@ -6,8 +6,8 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     
-    # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./digital_citizen.db")
+    # Database (PostgreSQL 15 on localhost:5432)
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:prince@localhost:5432/digital_citizen_db")
     
     # External API Keys
     SARVAM_API_KEY: str = os.getenv("SARVAM_API_KEY", "mock_sarvam_key")
