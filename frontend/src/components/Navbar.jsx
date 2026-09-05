@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
-import { Sun, Moon, Landmark, Database, Cpu, LogIn, UserCircle, LogOut } from 'lucide-react';
+import { Sun, Moon, Landmark, Database, Cpu, LogIn, UserCircle, LogOut, ShieldCheck } from 'lucide-react';
 import LanguageSelector from './LanguageSelector';
 import { useAuth } from '../context/AuthContext';
 
@@ -58,6 +58,9 @@ export default function Navbar() {
           </Link>
           <Link href="/tracking" className="hover:text-saffron-500 transition-colors">
             {t('nav_tracking')}
+          </Link>
+          <Link href="/trust-privacy" className="hover:text-saffron-500 transition-colors flex items-center gap-1 text-emerald-300">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> {t('nav_trust_privacy')}
           </Link>
         </nav>
 
